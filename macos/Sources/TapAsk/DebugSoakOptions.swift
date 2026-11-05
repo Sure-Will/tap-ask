@@ -4,6 +4,7 @@ import Foundation
 struct DebugSoakOptions {
     let rounds: Int
     let dwell: Double
+    let releaseOthers: Bool
 
     init?(arguments: [String]) throws {
         guard let index = arguments.firstIndex(of: "-TapAskSoak") else { return nil }
@@ -22,15 +23,25 @@ struct DebugSoakOptions {
         } else {
             dwell = 8
         }
+        if let releaseIndex = arguments.firstIndex(of: "-TapAskSoakReleaseOthers") {
+            guard arguments.indices.contains(releaseIndex + 1),
+                  ["YES", "NO"].contains(arguments[releaseIndex + 1]) else {
+                throw InvalidArgument.releaseOthers
+            }
+            releaseOthers = arguments[releaseIndex + 1] == "YES"
+        } else {
+            releaseOthers = false
+        }
     }
 
     private enum InvalidArgument: LocalizedError {
-        case rounds, dwell
+        case rounds, dwell, releaseOthers
 
         var errorDescription: String? {
             switch self {
             case .rounds: return "-TapAskSoak requires a positive integer round count"
             case .dwell: return "-TapAskSoakDwell requires positive finite seconds below Int64.max"
+            case .releaseOthers: return "-TapAskSoakReleaseOthers requires YES or NO"
             }
         }
     }

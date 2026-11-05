@@ -14,8 +14,8 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
             let suite = "TapAsk.CompletionTests.\(UUID().uuidString)"
             let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
             defer { defaults.removePersistentDomain(forName: suite) }
-            let owner = AppDelegate()
-            owner.configurePanel(defaults: defaults)
+            let owner = AppDelegate(defaults: defaults, websiteDataStore: .nonPersistent())
+            owner.configurePanel()
             defer {
                 owner.closeLoginPopup(restoreFocus: false)
                 owner.removeAllSessions()
@@ -88,8 +88,8 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let policy = try SharedFixtures.chatGPTPolicy()
-        let owner = AppDelegate()
-        owner.configurePanel(defaults: defaults)
+        let owner = AppDelegate(defaults: defaults, websiteDataStore: .nonPersistent())
+        owner.configurePanel()
         defer {
             owner.closeLoginPopup(restoreFocus: false)
             owner.removeAllSessions()

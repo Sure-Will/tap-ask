@@ -40,6 +40,13 @@ final class ProviderSession {
             }
             self.onCommit?()
         }
+        webDelegate.onProcessTermination = { [weak self] action in
+            guard let self else { return }
+            switch action {
+            case .reloadNow: self.reload()
+            case .deferUntilShown: self.needsReloadOnDisplay = true
+            }
+        }
     }
 
     private var lastPageKey: String { "LastPage.\(policy.provider.id)" }
@@ -63,7 +70,7 @@ final class ProviderSession {
         if case .failed = loadState {
             loadHome()
         } else if webView.url == nil {
-            loadHome()
+            loadInitialPage()
         } else {
             webView.reload()
         }
@@ -72,6 +79,21 @@ final class ProviderSession {
     func prepareForDisplay() {
         if needsReloadOnDisplay { reload() }
         else if case .failed = loadState { loadHome() }
+    }
+
+    /// Release the page's connections without touching persistent website data or LastPage.
+    func dispose() {
+        webView.stopLoading()
+        onLoadStateChange = nil
+        onCommit = nil
+        webDelegate.onLoadStateChange = nil
+        webDelegate.onNavigationNotice = nil
+        webDelegate.onCommit = nil
+        webDelegate.onProcessTermination = nil
+        webDelegate.onCreatePopup = nil
+        webDelegate.onClose = nil
+        webView.navigationDelegate = nil
+        webView.uiDelegate = nil
     }
 
     var title: String {

@@ -19,7 +19,8 @@ func makeProviderMenuItems(providers: [Provider], currentProviderID: String,
 /// Menu assembly is independent of NSStatusBar so its contract can be tested.
 @MainActor
 func makeStatusMenu(isPanelVisible: Bool, providerItems: [NSMenuItem], target: AnyObject,
-                    toggleAction: Selector, orderAction: Selector, reloadAction: Selector) -> NSMenu {
+                    toggleAction: Selector, orderAction: Selector, reloadAction: Selector,
+                    releaseOthersAction: Selector) -> NSMenu {
     let menu = NSMenu()
     let toggle = menu.addItem(withTitle: panelVisibilityMenuTitle(isVisible: isPanelVisible),
                               action: toggleAction, keyEquivalent: " ")
@@ -33,6 +34,8 @@ func makeStatusMenu(isPanelVisible: Bool, providerItems: [NSMenuItem], target: A
     let reload = menu.addItem(withTitle: "重新加载", action: reloadAction, keyEquivalent: "r")
     reload.target = target
     reload.keyEquivalentModifierMask = .command
+    let releaseOthers = menu.addItem(withTitle: "释放其他服务商页面", action: releaseOthersAction, keyEquivalent: "")
+    releaseOthers.target = target
     menu.addItem(.separator())
     let quit = menu.addItem(withTitle: "退出 TapAsk", action: #selector(NSApplication.terminate(_:)),
                             keyEquivalent: "q")

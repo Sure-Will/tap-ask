@@ -30,8 +30,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var providerOrderWindow: ProviderOrderWindowController?
     private var providerMenu: NSMenu?
     private var statusMenu: NSMenu?
-    private var sessions: [String: ProviderSession] = [:]
-    private var currentSession: ProviderSession!
+    private(set) var sessions: [String: ProviderSession] = [:]
+    private(set) var currentSession: ProviderSession!
+    private let defaults: UserDefaults
+    private let websiteDataStore: WKWebsiteDataStore
     private(set) var loginPopup: LoginPopup?
     private var hotKey: HotKey?
     private var statusItem: NSStatusItem?
@@ -41,17 +43,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var soakTask: Task<Void, Never>?
     #endif
 
+    init(catalog: ProviderCatalog? = nil, defaults: UserDefaults = .standard,
+         websiteDataStore: WKWebsiteDataStore = .default()) {
+        self.catalog = catalog
+        self.defaults = defaults
+        self.websiteDataStore = websiteDataStore
+        super.init()
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         let launchEvent = NSAppleEventManager.shared().currentAppleEvent
         let launchedAtLogin = launchEvent?.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue
             == keyAELaunchedAsLogInItem
             || launchEvent?.paramDescriptor(forKeyword: keyAELaunchedAsLogInItem) != nil
 
-        catalog = loadProviders()
+        catalog = catalog ?? loadProviders()
         orderedProviders = ProviderOrder.ordered(catalog.providers,
-                                                 savedIDs: UserDefaults.standard.stringArray(forKey: "ProviderOrder"))
+                                                 savedIDs: defaults.stringArray(forKey: "ProviderOrder"))
         guard let provider = ProviderSelection.restored(in: orderedProviders,
-                                                        savedID: UserDefaults.standard.string(forKey: "LastProviderID")) else {
+                                                        savedID: defaults.string(forKey: "LastProviderID")) else {
             fatalError("TapAsk: providers.json 必须至少包含一个服务商。")
         }
         configurePanel()
@@ -84,7 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         #endif
     }
 
-    func configurePanel(defaults: UserDefaults = .standard) {
+    func configurePanel() {
         panel = ChatPanel(defaults: defaults)
         panel.onCancel = { [weak self] in self?.hidePanel() }
         panel.onRetry = { [weak self] in self?.currentSession.loadHome() }
@@ -129,6 +139,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     private func presentPanel() {
+        if currentSession.needsReloadOnDisplay { currentSession.prepareForDisplay() }
         if !panel.isVisible { panel.prepareForPresentation() }
         needsWebFocus = true
         if NSApp.isHidden { NSApp.unhide(nil) }
@@ -147,7 +158,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
     }
 
-    private func switchProvider(to provider: Provider) {
+    func switchProvider(to provider: Provider) {
         if let currentSession, currentSession.policy.provider.id == provider.id {
             currentSession.prepareForDisplay()
             return
@@ -156,7 +167,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let existing = sessions[provider.id]
         let session = existing ?? makeSession(for: provider)
         displaySession(session)
-        UserDefaults.standard.set(provider.id, forKey: "LastProviderID")
+        defaults.set(provider.id, forKey: "LastProviderID")
         if existing == nil { session.loadInitialPage() }
     }
 
@@ -174,15 +185,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     /// Termination releases both the visible page and the cached background pages.
     func removeAllSessions() {
-        for session in sessions.values { session.webView.stopLoading() }
+        for session in sessions.values { session.dispose() }
         panel?.makeFirstResponder(nil)
         panel?.contentView = nil
         currentSession = nil
         sessions.removeAll()
     }
 
-    private func makeSession(for provider: Provider) -> ProviderSession {
-        let session = ProviderSession(provider: provider, identityHosts: catalog.identityHosts)
+    @objc func releaseOtherProviderPages(_ sender: Any?) {
+        for (id, session) in sessions where id != currentSession.policy.provider.id {
+            session.dispose()
+            sessions.removeValue(forKey: id)
+        }
+    }
+
+    func makeSession(for provider: Provider) -> ProviderSession {
+        let session = ProviderSession(provider: provider, identityHosts: catalog.identityHosts,
+                                      defaults: defaults, websiteDataStore: websiteDataStore)
         let policy = session.policy
         session.onLoadStateChange = { [weak self] state in
             guard let self, self.currentSession?.policy.provider.id == provider.id else { return }
@@ -284,6 +303,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             menuItem.state = provider?.id == currentSession.policy.provider.id ? .on : .off
         } else if menuItem.action == #selector(togglePanelFromMenu(_:)) {
             menuItem.title = panelVisibilityMenuTitle(isVisible: panel.isVisible)
+        } else if menuItem.action == #selector(releaseOtherProviderPages(_:)) {
+            return sessions.count > 1
         }
         return true
     }
@@ -321,7 +342,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private func makeCurrentStatusMenu() -> NSMenu {
         makeStatusMenu(isPanelVisible: panel.isVisible, providerItems: makeProviderMenuItems(), target: self,
                        toggleAction: #selector(togglePanelFromMenu(_:)),
-                       orderAction: #selector(showProviderOrder(_:)), reloadAction: #selector(reloadProviderPage(_:)))
+                       orderAction: #selector(showProviderOrder(_:)), reloadAction: #selector(reloadProviderPage(_:)),
+                       releaseOthersAction: #selector(releaseOtherProviderPages(_:)))
     }
 
     private func rebuildProviderMenus() {
@@ -341,8 +363,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     private func saveProviderOrder(_ ids: [String]?) {
-        if let ids { UserDefaults.standard.set(ids, forKey: "ProviderOrder") }
-        else { UserDefaults.standard.removeObject(forKey: "ProviderOrder") }
+        if let ids { defaults.set(ids, forKey: "ProviderOrder") }
+        else { defaults.removeObject(forKey: "ProviderOrder") }
         orderedProviders = ProviderOrder.ordered(catalog.providers, savedIDs: ids)
         providerOrderWindow?.update(providers: orderedProviders)
         rebuildProviderMenus()
@@ -411,6 +433,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                     catch { return }
                     self.providerOrderWindow?.window?.performClose(nil)
                 }
+            }
+            if options.releaseOthers {
+                guard !Task.isCancelled, let self, let first = providers.first else { return }
+                self.switchProvider(to: first)
+                let before = self.sessions.count
+                self.releaseOtherProviderPages(nil)
+                AppLog.lifecycle.notice("phase=soak release-others before=\(before, privacy: .public) sessions=\(self.sessions.count, privacy: .public)")
+                // Leave a bounded sampling window before the usual soak shutdown.
+                do { try await Task.sleep(for: .seconds(options.dwell)) }
+                catch { return }
             }
             AppLog.lifecycle.notice("phase=soak done")
             self?.soakTask = nil

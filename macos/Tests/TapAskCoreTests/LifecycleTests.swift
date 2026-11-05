@@ -44,8 +44,8 @@ final class LifecycleTests: XCTestCase {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let catalog = try localCatalog()
-        let owner = AppDelegate()
-        owner.configurePanel(defaults: defaults)
+        let owner = AppDelegate(defaults: defaults, websiteDataStore: .nonPersistent())
+        owner.configurePanel()
         defer { owner.panel.orderOut(nil) }
         weak var cachedSession: ProviderSession?
         weak var cachedWebView: WKWebView?
@@ -86,6 +86,225 @@ final class LifecycleTests: XCTestCase {
         XCTAssertNil(visibleDelegate)
         XCTAssertNil(owner.panel.contentView)
         withExtendedLifetime(owner) {}
+    }
+
+    @MainActor
+    func testReleaseOtherPagesReleasesTwoSessionsKeepsCurrentPopupAndAllowsRecreation() throws {
+        _ = NSApplication.shared
+        let suite = "TapAsk.LifecycleTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let catalog = try localCatalog()
+        let store = WKWebsiteDataStore.nonPersistent()
+        let owner = AppDelegate(catalog: catalog, defaults: defaults, websiteDataStore: store)
+        owner.configurePanel()
+        defer {
+            owner.closeLoginPopup(restoreFocus: false)
+            owner.removeAllSessions()
+            owner.panel.orderOut(nil)
+        }
+        let releaseItem = NSMenuItem(title: "释放其他服务商页面",
+                                     action: #selector(AppDelegate.releaseOtherProviderPages(_:)), keyEquivalent: "")
+        XCTAssertFalse(owner.validateMenuItem(releaseItem))
+        weak var first: ProviderSession?
+        weak var second: ProviderSession?
+        weak var current: ProviderSession?
+        weak var firstPage: WKWebView?
+        weak var secondPage: WKWebView?
+        weak var currentPage: WKWebView?
+        weak var firstDelegate: WebViewDelegate?
+        weak var secondDelegate: WebViewDelegate?
+        autoreleasepool {
+            for (index, provider) in catalog.providers.enumerated() {
+                let session = owner.makeSession(for: provider)
+                owner.displaySession(session)
+                loadLocalPage(session.webView, provider: provider)
+                defaults.set("https://\(provider.hosts[0])/conversation/last", forKey: "LastPage.\(provider.id)")
+                switch index {
+                case 0:
+                    first = session
+                    firstPage = session.webView
+                    firstDelegate = session.webDelegate
+                case 1:
+                    second = session
+                    secondPage = session.webView
+                    secondDelegate = session.webDelegate
+                default:
+                    current = session
+                    currentPage = session.webView
+                }
+                XCTAssertEqual(owner.validateMenuItem(releaseItem), index > 0)
+            }
+        }
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = store
+        _ = owner.openLoginPopup(configuration: configuration, policy: try XCTUnwrap(current).policy,
+                                 initialURL: URL(string: "about:blank"))
+        weak var popup: LoginPopup?
+        weak var popupPage: WKWebView?
+        autoreleasepool {
+            popup = owner.loginPopup
+            popupPage = owner.loginPopup?.webView
+        }
+        try autoreleasepool {
+            let released = [try XCTUnwrap(first), try XCTUnwrap(second)]
+            owner.releaseOtherProviderPages(nil)
+            for session in released {
+                XCTAssertNil(session.onLoadStateChange)
+                XCTAssertNil(session.onCommit)
+                XCTAssertNil(session.webDelegate.onLoadStateChange)
+                XCTAssertNil(session.webDelegate.onCommit)
+                XCTAssertNil(session.webDelegate.onProcessTermination)
+                XCTAssertNil(session.webDelegate.onNavigationNotice)
+                XCTAssertNil(session.webDelegate.onCreatePopup)
+                XCTAssertNil(session.webDelegate.onClose)
+                XCTAssertNil(session.webView.navigationDelegate)
+                XCTAssertNil(session.webView.uiDelegate)
+            }
+        }
+        advanceMainRunLoop(until: {
+            first == nil && second == nil && firstPage == nil && secondPage == nil
+                && firstDelegate == nil && secondDelegate == nil
+        })
+        XCTAssertNil(first)
+        XCTAssertNil(second)
+        XCTAssertNil(firstPage)
+        XCTAssertNil(secondPage)
+        XCTAssertNil(firstDelegate)
+        XCTAssertNil(secondDelegate)
+        XCTAssertNotNil(current)
+        XCTAssertNotNil(currentPage)
+        XCTAssertTrue(owner.currentSession === current)
+        XCTAssertTrue(owner.panel.contentView === currentPage)
+        XCTAssertTrue(currentPage?.navigationDelegate === current?.webDelegate)
+        XCTAssertEqual(Array(owner.sessions.keys), [catalog.providers[2].id])
+        XCTAssertNotNil(popup)
+        XCTAssertNotNil(popupPage)
+        XCTAssertTrue(owner.loginPopup === popup)
+        XCTAssertNotNil(popupPage?.navigationDelegate)
+        XCTAssertFalse(owner.validateMenuItem(releaseItem))
+        for provider in catalog.providers {
+            XCTAssertEqual(defaults.string(forKey: "LastPage.\(provider.id)"),
+                           "https://\(provider.hosts[0])/conversation/last")
+        }
+
+        owner.switchProvider(to: catalog.providers[0])
+        let recreated = try XCTUnwrap(owner.sessions[catalog.providers[0].id])
+        XCTAssertTrue(owner.currentSession === recreated)
+        XCTAssertTrue(owner.panel.contentView === recreated.webView)
+        XCTAssertTrue(recreated.webView.configuration.websiteDataStore === store)
+        XCTAssertTrue(recreated.webView.navigationDelegate === recreated.webDelegate)
+        XCTAssertEqual(owner.sessions.count, 2)
+        XCTAssertTrue(owner.validateMenuItem(releaseItem))
+        XCTAssertNil(first, "The released session must not be resurrected")
+    }
+
+    @MainActor
+    func testBackgroundTerminationWaitsForDisplayThenRestoresLastPageWithHomeFallback() async throws {
+        _ = NSApplication.shared
+        let suite = "TapAsk.LifecycleTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let catalog = try localCatalog(firstHome: "https://one.invalid/")
+        let owner = AppDelegate(catalog: catalog, defaults: defaults, websiteDataStore: .nonPersistent())
+        owner.configurePanel()
+        defer {
+            owner.removeAllSessions()
+            owner.panel.orderOut(nil)
+        }
+        let background = owner.makeSession(for: catalog.providers[0])
+        let current = owner.makeSession(for: catalog.providers[1])
+        let lastPage = "https://one.invalid/conversation/last"
+        defaults.set(lastPage, forKey: "LastPage.local-one")
+        owner.displaySession(background)
+        background.webDelegate.webView(background.webView, didCommit: nil)
+        owner.displaySession(current)
+        current.webDelegate.webView(current.webView, didCommit: nil)
+        let overlay = try XCTUnwrap(current.webView.subviews.compactMap { $0 as? PageLoadOverlayView }.first)
+        let observer = LifecycleNavigationObserver()
+        background.webView.navigationDelegate = observer
+        let premature = expectation(description: "Background termination must not load")
+        premature.isInverted = true
+        let restored = expectation(description: "Displaying the terminated session restores LastPage")
+        let fallback = expectation(description: "Restore failure loads home once")
+        let duplicate = expectation(description: "No duplicate reload or repeated fallback")
+        duplicate.isInverted = true
+        var displayAllowed = false
+        var requests: [URLRequest] = []
+        observer.onRequest = { request in
+            requests.append(request)
+            if !displayAllowed { premature.fulfill() }
+            background.webDelegate.webView(background.webView, didStartProvisionalNavigation: nil)
+            switch requests.count {
+            case 1: restored.fulfill()
+            case 2: fallback.fulfill()
+            default: duplicate.fulfill()
+            }
+        }
+        XCTAssertNil(background.webView.url, "Simulate termination before WebKit retains a usable URL")
+        background.webDelegate.webViewWebContentProcessDidTerminate(background.webView)
+        XCTAssertTrue(background.needsReloadOnDisplay)
+        XCTAssertEqual(background.loadState, .loading)
+        XCTAssertFalse(background.webView.isLoading)
+        await fulfillment(of: [premature], timeout: 0.5)
+        XCTAssertTrue(requests.isEmpty)
+        XCTAssertTrue(overlay.isHidden, "A background crash must not change the current page's overlay")
+        XCTAssertEqual(current.loadState, .loaded)
+
+        displayAllowed = true
+        owner.switchProvider(to: catalog.providers[0])
+        XCTAssertFalse(background.needsReloadOnDisplay)
+        await fulfillment(of: [restored], timeout: 3)
+        XCTAssertEqual(requests.compactMap(\.url), [URL(string: lastPage)!])
+        XCTAssertEqual(requests.first?.timeoutInterval, 20)
+        try await Task.sleep(for: .milliseconds(450))
+        XCTAssertTrue(overlay.superview === background.webView)
+        XCTAssertFalse(overlay.isHidden, "The newly displayed page must show its normal loading overlay")
+        owner.switchProvider(to: catalog.providers[1])
+        owner.switchProvider(to: catalog.providers[0])
+        XCTAssertEqual(requests.count, 1)
+
+        let error = NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut)
+        background.webDelegate.webView(background.webView, didFailProvisionalNavigation: nil, withError: error)
+        await fulfillment(of: [fallback], timeout: 3)
+        XCTAssertEqual(requests.compactMap(\.url), [URL(string: lastPage)!, catalog.providers[0].home])
+        background.webDelegate.webView(background.webView, didFailProvisionalNavigation: nil, withError: error)
+        XCTAssertEqual(background.loadState, .failed(PageLoadFailure(domain: error.domain, code: error.code)))
+        await fulfillment(of: [duplicate], timeout: 0.2)
+        XCTAssertEqual(defaults.string(forKey: "LastPage.local-one"), lastPage)
+        withExtendedLifetime(observer) {}
+    }
+
+    @MainActor
+    func testHiddenCurrentSessionRecoversWhenMainWindowIsReopened() async throws {
+        _ = NSApplication.shared
+        let suite = "TapAsk.LifecycleTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let catalog = try localCatalog()
+        let owner = AppDelegate(catalog: catalog, defaults: defaults, websiteDataStore: .nonPersistent())
+        owner.configurePanel()
+        defer {
+            owner.removeAllSessions()
+            owner.panel.orderOut(nil)
+        }
+        let session = owner.makeSession(for: catalog.providers[0])
+        owner.displaySession(session)
+        let observer = LifecycleNavigationObserver()
+        session.webView.navigationDelegate = observer
+        let restored = expectation(description: "Reopening a hidden window recovers its terminated page")
+        observer.onRequest = { request in
+            XCTAssertEqual(request.url, catalog.providers[0].home)
+            restored.fulfill()
+        }
+        XCTAssertFalse(owner.panel.isVisible)
+        session.webDelegate.webViewWebContentProcessDidTerminate(session.webView)
+        XCTAssertTrue(session.needsReloadOnDisplay)
+        XCTAssertFalse(session.webView.isLoading)
+        XCTAssertFalse(owner.applicationShouldHandleReopen(NSApplication.shared, hasVisibleWindows: false))
+        XCTAssertFalse(session.needsReloadOnDisplay)
+        await fulfillment(of: [restored], timeout: 3)
+        withExtendedLifetime(observer) {}
     }
 
     @MainActor
@@ -131,8 +350,8 @@ final class LifecycleTests: XCTestCase {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let policy = NavigationPolicy(provider: try localCatalog().providers[0], identityHosts: [])
-        let owner = AppDelegate()
-        owner.configurePanel(defaults: defaults)
+        let owner = AppDelegate(defaults: defaults, websiteDataStore: .nonPersistent())
+        owner.configurePanel()
         defer { owner.panel.orderOut(nil) }
         weak var popup: LoginPopup?
         weak var overlay: PageLoadOverlayView?
@@ -219,7 +438,8 @@ final class LifecycleTests: XCTestCase {
             let items = makeProviderMenuItems(providers: providers, currentProviderID: providers[0].id,
                                               target: owner, action: action)
             statusMenu = makeStatusMenu(isPanelVisible: true, providerItems: items, target: owner,
-                                        toggleAction: action, orderAction: action, reloadAction: action)
+                                        toggleAction: action, orderAction: action, reloadAction: action,
+                                        releaseOthersAction: action)
             XCTAssertTrue(mainMenu.items.first?.target === owner)
             XCTAssertTrue(statusMenu?.items.first?.target === owner)
         }
@@ -229,7 +449,7 @@ final class LifecycleTests: XCTestCase {
         let targetItems = (mainMenu.items + status.items).filter {
             $0.action == #selector(LifecycleMenuTarget.performAction(_:))
         }
-        XCTAssertEqual(targetItems.count, providers.count * 2 + 3)
+        XCTAssertEqual(targetItems.count, providers.count * 2 + 4)
         for item in targetItems { XCTAssertNil(item.target) }
         withExtendedLifetime((mainMenu, status)) {}
     }
@@ -243,8 +463,8 @@ final class LifecycleTests: XCTestCase {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let policy = NavigationPolicy(provider: try localCatalog().providers[0], identityHosts: [])
-        let owner = AppDelegate()
-        owner.configurePanel(defaults: defaults)
+        let owner = AppDelegate(defaults: defaults, websiteDataStore: .nonPersistent())
+        owner.configurePanel()
         let parent = try XCTUnwrap(owner.panel)
         autoreleasepool {
             let session = ProviderSession(provider: policy.provider, identityHosts: [], defaults: defaults,
@@ -300,12 +520,13 @@ final class LifecycleTests: XCTestCase {
         withExtendedLifetime((owner, parent)) {}
     }
 
-    private func localCatalog() throws -> ProviderCatalog {
-        // Even a content-process termination can only retry about:blank, never a real provider.
+    private func localCatalog(firstHome: String = "about:blank") throws -> ProviderCatalog {
+        // Recovery tests intercept requests; ordinary fixtures can only retry about:blank.
         try JSONDecoder().decode(ProviderCatalog.self, from: Data("""
             {"identityHosts": [], "providers": [
-              {"id": "local-one", "name": "Local One", "home": "about:blank", "hosts": ["one.invalid"]},
-              {"id": "local-two", "name": "Local Two", "home": "about:blank", "hosts": ["two.invalid"]}
+              {"id": "local-one", "name": "Local One", "home": "\(firstHome)", "hosts": ["one.invalid"]},
+              {"id": "local-two", "name": "Local Two", "home": "about:blank", "hosts": ["two.invalid"]},
+              {"id": "local-three", "name": "Local Three", "home": "about:blank", "hosts": ["three.invalid"]}
             ]}
             """.utf8))
     }
@@ -331,4 +552,15 @@ final class LifecycleTests: XCTestCase {
 @MainActor
 private final class LifecycleMenuTarget: NSObject {
     @objc func performAction(_ sender: Any?) {}
+}
+
+@MainActor
+private final class LifecycleNavigationObserver: NSObject, WKNavigationDelegate {
+    var onRequest: ((URLRequest) -> Void)?
+
+    func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+                 decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
+        decisionHandler(.cancel) // Inspect recovery without contacting any host.
+        onRequest?(navigationAction.request)
+    }
 }
