@@ -23,12 +23,14 @@ enum TapAskApplication {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var panel: ChatPanel!
-    private var webView: WKWebView!
-    private var webDelegate: WebViewDelegate!
+    private var catalog: ProviderCatalog!
+    private var sessions: [String: ProviderSession] = [:]
+    private var currentSession: ProviderSession!
     private var loginPopup: LoginPopup?
     private var hotKey: HotKey?
+    private var statusItem: NSStatusItem?
     private var hotKeyStartedAt: UInt64?
     private var needsWebFocus = false
 
@@ -38,30 +40,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             == keyAELaunchedAsLogInItem
             || launchEvent?.paramDescriptor(forKeyword: keyAELaunchedAsLogInItem) != nil
 
-        installMainMenu()
-        let catalog = loadProviders()
-        guard let provider = catalog.providers.first else {
+        catalog = loadProviders()
+        guard let provider = ProviderSelection.restored(in: catalog.providers,
+                                                        savedID: UserDefaults.standard.string(forKey: "LastProviderID")) else {
             fatalError("TapAsk: providers.json 必须至少包含一个服务商。")
         }
-        let policy = NavigationPolicy(provider: provider, identityHosts: catalog.identityHosts)
         panel = ChatPanel()
         panel.onCancel = { [weak self] in self?.hidePanel() }
+        panel.onRetry = { [weak self] in self?.currentSession.loadHome() }
         panel.onBecomeKey = { [weak self] in
             if self?.loginPopup == nil { self?.recordKeyLatency() }
         }
 
-        let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = .default()
-        webDelegate = WebViewDelegate(policy: policy)
-        webView = webDelegate.makeWebView(configuration: configuration)
-        webDelegate.onCommit = { [weak self] url in
-            self?.panel.title = policy.isProviderURL(url) ? "" : NavigationPolicy.origin(url)
-        }
-        webDelegate.onCreatePopup = { [weak self] configuration, url in
-            self?.openLoginPopup(configuration: configuration, policy: policy, initialURL: url)
-        }
-        panel.contentView = webView
-        webView.load(URLRequest(url: provider.home))
+        switchProvider(to: provider)
+        installMainMenu()
+        installStatusItem()
 
         registerLoginItemOnce()
         var hotKeyUnavailable = false
@@ -125,8 +118,47 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             loginPopup.show(relativeTo: panel)
         } else {
             panel.makeKeyAndOrderFront(nil)
-            panel.makeFirstResponder(webView)
+            panel.makeFirstResponder(currentSession.webView)
         }
+    }
+
+    private func switchProvider(to provider: Provider) {
+        if let currentSession, currentSession.policy.provider.id == provider.id {
+            if case .failed = currentSession.loadState { currentSession.loadHome() }
+            return
+        }
+        closeLoginPopup(restoreFocus: false)
+        let existing = sessions[provider.id]
+        let session = existing ?? makeSession(for: provider)
+        sessions[provider.id] = session
+        currentSession = session
+        panel.contentView = session.webView
+        panel.origin = session.title
+        panel.updateLoadState(session.loadState, providerName: provider.name)
+        if panel.isVisible, !NSApp.isHidden { panel.makeKeyAndOrderFront(nil) }
+        panel.makeFirstResponder(session.webView)
+        UserDefaults.standard.set(provider.id, forKey: "LastProviderID")
+        if existing == nil { session.loadHome() }
+        else if case .failed = session.loadState { session.loadHome() }
+    }
+
+    private func makeSession(for provider: Provider) -> ProviderSession {
+        let session = ProviderSession(provider: provider, identityHosts: catalog.identityHosts)
+        let policy = session.policy
+        session.onLoadStateChange = { [weak self] state in
+            guard let self, self.currentSession?.policy.provider.id == provider.id else { return }
+            self.panel.updateLoadState(state, providerName: provider.name)
+        }
+        session.webDelegate.onCommit = { [weak self] _ in
+            guard let self, self.currentSession?.policy.provider.id == provider.id else { return }
+            self.panel.origin = self.currentSession.title
+        }
+        session.webDelegate.onCreatePopup = { [weak self] configuration, url in
+            // A retained background page must not open a login window for the visible provider.
+            guard let self, self.currentSession?.policy.provider.id == provider.id else { return nil }
+            return self.openLoginPopup(configuration: configuration, policy: policy, initialURL: url)
+        }
+        return session
     }
 
     private func openLoginPopup(configuration: WKWebViewConfiguration, policy: NavigationPolicy,
@@ -173,7 +205,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotKeyStartedAt = nil
     }
 
-    @objc private func reloadPage(_ sender: Any?) { webView.reload() }
+    @objc private func reloadPage(_ sender: Any?) { currentSession.reload() }
+
+    @objc private func togglePanelFromMenu(_ sender: Any?) { togglePanel() }
+
+    @objc private func selectProvider(_ sender: NSMenuItem) {
+        guard let provider = ProviderSelection.provider(at: sender.tag, in: catalog.providers) else { return }
+        switchProvider(to: provider)
+        presentPanel()
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(selectProvider(_:)) {
+            let provider = ProviderSelection.provider(at: menuItem.tag, in: catalog.providers)
+            menuItem.state = provider?.id == currentSession.policy.provider.id ? .on : .off
+        } else if menuItem.action == #selector(togglePanelFromMenu(_:)) {
+            menuItem.title = panelVisibilityMenuTitle(isVisible: panel.isVisible)
+        }
+        return true
+    }
+
+    private func makeProviderMenuItems() -> [NSMenuItem] {
+        TapAsk.makeProviderMenuItems(providers: catalog.providers,
+                                    currentProviderID: currentSession.policy.provider.id,
+                                    target: self, action: #selector(selectProvider(_:)))
+    }
+
+    private func installStatusItem() {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.button?.image = makeStatusImage()
+        item.button?.toolTip = "TapAsk"
+        item.menu = makeStatusMenu(isPanelVisible: panel.isVisible,
+                                   providerItems: makeProviderMenuItems(), target: self,
+                                   toggleAction: #selector(togglePanelFromMenu(_:)),
+                                   reloadAction: #selector(reloadPage(_:)))
+        statusItem = item
+    }
 
     private func loadProviders() -> ProviderCatalog {
         guard let url = Bundle.main.url(forResource: "providers", withExtension: "json") else {
@@ -223,7 +290,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let viewMenu = NSMenu(title: "View")
         let reload = viewMenu.addItem(withTitle: "重新加载", action: #selector(reloadPage(_:)), keyEquivalent: "r")
         reload.target = self
-        for submenu in [appMenu, editMenu, viewMenu] {
+        let providerMenu = NSMenu(title: "服务商")
+        for item in makeProviderMenuItems() { providerMenu.addItem(item) }
+        for submenu in [appMenu, editMenu, providerMenu, viewMenu] {
             let item = NSMenuItem(title: submenu.title, action: nil, keyEquivalent: "")
             item.submenu = submenu
             main.addItem(item)

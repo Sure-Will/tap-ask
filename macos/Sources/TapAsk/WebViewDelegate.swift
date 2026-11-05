@@ -8,6 +8,8 @@ final class WebViewDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
     private static let safariUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
     private let policy: NavigationPolicy
     private let isPopup: Bool
+    private var loadState: PageLoadState = .idle
+    var onLoadStateChange: ((PageLoadState) -> Void)?
     var onCommit: ((URL?) -> Void)?
     var onCreatePopup: ((WKWebViewConfiguration, URL?) -> WKWebView?)?
     var onClose: (() -> Void)?
@@ -84,9 +86,42 @@ final class WebViewDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
         if !allowed { webView.stopLoading() }
     }
 
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+        updateLoadState(.start)
+    }
+
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        updateLoadState(.commit)
         // The visible document keeps its origin until the next document actually commits.
         onCommit?(webView.url)
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!,
+                 withError error: Error) {
+        handleLoadFailure(error as NSError, in: webView)
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        handleLoadFailure(error as NSError, in: webView)
+    }
+
+    private func updateLoadState(_ event: PageLoadEvent) {
+        guard !isPopup else { return }
+        let next = nextPageLoadState(from: loadState, on: event)
+        guard next != loadState else { return }
+        loadState = next
+        onLoadStateChange?(next)
+    }
+
+    private func handleLoadFailure(_ error: NSError, in webView: WKWebView) {
+        guard !isPopup else { return }
+        let url = (error.userInfo[NSURLErrorFailingURLErrorKey] as? URL)
+            ?? (error.userInfo[NSURLErrorFailingURLStringErrorKey] as? String).flatMap { URL(string: $0) }
+            ?? webView.url
+        let host = url?.host?.lowercased() ?? "<none>"
+        let result: NavigationPolicy.Decision = policy.isPanelURL(url) ? .allow : .cancel
+        AppLog.navigation.error("provider=\(self.policy.provider.id, privacy: .public) phase=main-fail host=\(host, privacy: .public) policy=\(result.rawValue, privacy: .public) domain=\(error.domain, privacy: .public) code=\(error.code, privacy: .public)")
+        updateLoadState(.fail(domain: error.domain, code: error.code))
     }
 
     func webView(_ webView: WKWebView, createWebViewWith configuration: WKWebViewConfiguration,
@@ -134,14 +169,19 @@ final class WebViewDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        updateLoadState(.processTerminated)
         log(webView.url, phase: "process-terminated-reload", result: .allow)
         if webView.url != nil { webView.reload() }
-        else { webView.load(URLRequest(url: policy.provider.home)) }
+        else {
+            var request = URLRequest(url: policy.provider.home)
+            if !isPopup { request.timeoutInterval = 20 }
+            webView.load(request)
+        }
     }
 
     private func log(_ url: URL?, phase: String, result: NavigationPolicy.Decision) {
         let host = url?.host?.lowercased() ?? "<none>"
         let scope = isPopup ? "popup" : "main"
-        AppLog.navigation.info("phase=\(scope, privacy: .public)-\(phase, privacy: .public) host=\(host, privacy: .public) policy=\(result.rawValue, privacy: .public)")
+        AppLog.navigation.info("provider=\(self.policy.provider.id, privacy: .public) phase=\(scope, privacy: .public)-\(phase, privacy: .public) host=\(host, privacy: .public) policy=\(result.rawValue, privacy: .public)")
     }
 }

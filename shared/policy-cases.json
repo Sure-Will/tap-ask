@@ -215,6 +215,41 @@
       "group": "additionalPolicyBranches",
       "url": "https://user:pass@chatgpt.com/",
       "expected": false
+    },
+    {
+      "id": "deepseek-home",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "deepseek",
+      "url": "https://chat.deepseek.com/",
+      "expected": true
+    },
+    {
+      "id": "deepseek-sign-in",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "deepseek",
+      "url": "https://chat.deepseek.com/sign_in",
+      "expected": true
+    },
+    {
+      "id": "deepseek-apple-login",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "deepseek",
+      "url": "https://appleid.apple.com/auth/authorize",
+      "expected": true
+    },
+    {
+      "id": "deepseek-public-site-untrusted",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "deepseek",
+      "url": "https://www.deepseek.com/",
+      "expected": false
+    },
+    {
+      "id": "deepseek-chatgpt-untrusted",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "deepseek",
+      "url": "https://chatgpt.com/",
+      "expected": false
     }
   ],
   "actions": [
@@ -514,6 +549,114 @@
       "wantsDownload": false,
       "sourceURL": "https://chatgpt.com/c/example",
       "expected": "cancel"
+    },
+    {
+      "id": "deepseek-home-action",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "deepseek",
+      "url": "https://chat.deepseek.com/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chat.deepseek.com/sign_in",
+      "expected": "allow"
+    },
+    {
+      "id": "deepseek-sign-in-action",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "deepseek",
+      "url": "https://chat.deepseek.com/sign_in",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chat.deepseek.com/sign_in",
+      "expected": "allow"
+    },
+    {
+      "id": "deepseek-apple-login-action",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "deepseek",
+      "url": "https://appleid.apple.com/auth/authorize",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chat.deepseek.com/sign_in",
+      "expected": "allow"
+    },
+    {
+      "id": "deepseek-public-site-script",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "deepseek",
+      "url": "https://www.deepseek.com/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chat.deepseek.com/sign_in",
+      "expected": "cancel"
+    },
+    {
+      "id": "deepseek-public-site-click",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "deepseek",
+      "url": "https://www.deepseek.com/",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chat.deepseek.com/sign_in",
+      "expected": "browser"
+    },
+    {
+      "id": "deepseek-chatgpt-script",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "deepseek",
+      "url": "https://chatgpt.com/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chat.deepseek.com/sign_in",
+      "expected": "cancel"
+    },
+    {
+      "id": "deepseek-wechat-subframe",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "deepseek",
+      "url": "https://open.weixin.qq.com/",
+      "topLevel": false,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chat.deepseek.com/sign_in",
+      "expected": "allow"
+    },
+    {
+      "id": "deepseek-wechat-top-level",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "deepseek",
+      "url": "https://open.weixin.qq.com/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chat.deepseek.com/sign_in",
+      "expected": "cancel"
+    },
+    {
+      "id": "chatgpt-deepseek-script",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "chatgpt",
+      "url": "https://chat.deepseek.com/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/",
+      "expected": "cancel"
     }
   ],
   "responses": [
@@ -696,6 +839,66 @@
       "canDisplay": true,
       "attachment": false,
       "expected": "cancel"
+    },
+    {
+      "id": "deepseek-home-response",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "deepseek",
+      "url": "https://chat.deepseek.com/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
+    },
+    {
+      "id": "deepseek-sign-in-response",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "deepseek",
+      "url": "https://chat.deepseek.com/sign_in",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
+    },
+    {
+      "id": "deepseek-apple-login-response",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "deepseek",
+      "url": "https://appleid.apple.com/auth/authorize",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
+    },
+    {
+      "id": "deepseek-public-site-response",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "deepseek",
+      "url": "https://www.deepseek.com/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "deepseek-chatgpt-response",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "deepseek",
+      "url": "https://chatgpt.com/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "deepseek-wechat-subframe-response",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "deepseek",
+      "url": "https://open.weixin.qq.com/",
+      "mainFrame": false,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
     }
   ],
   "origins": [
@@ -740,6 +943,30 @@
       "group": "additionalPolicyBranches",
       "url": "HTTPS://CHATGPT.COM/path?token=secret#fragment",
       "expected": "https://chatgpt.com"
+    },
+    {
+      "id": "deepseek-own-origin",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "deepseek",
+      "url": "https://chat.deepseek.com/sign_in?token=secret",
+      "expected": "https://chat.deepseek.com",
+      "isProviderURL": true
+    },
+    {
+      "id": "deepseek-identity-origin",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "deepseek",
+      "url": "https://appleid.apple.com/auth/authorize?token=secret",
+      "expected": "https://appleid.apple.com",
+      "isProviderURL": false
+    },
+    {
+      "id": "deepseek-other-provider-origin",
+      "group": "testDeepSeekNavigationAndOrigins",
+      "provider": "deepseek",
+      "url": "https://chatgpt.com/",
+      "expected": "https://chatgpt.com",
+      "isProviderURL": false
     }
   ]
 }

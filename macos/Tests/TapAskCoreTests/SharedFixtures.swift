@@ -19,15 +19,25 @@ enum SharedFixtures {
     }
 
     static func chatGPTPolicy() throws -> NavigationPolicy {
-        let catalog = try catalog()
-        guard let provider = catalog.providers.first(where: { $0.home.host?.lowercased() == "chatgpt.com" }) else {
-            throw FixtureError.missingChatGPT
+        try policy(for: nil, in: catalog())
+    }
+
+    static func policy(for providerID: String?, in catalog: ProviderCatalog) throws -> NavigationPolicy {
+        let id = providerID ?? "chatgpt"
+        guard let provider = catalog.providers.first(where: { $0.id == id }) else {
+            throw FixtureError.unknownProvider(id)
         }
         return NavigationPolicy(provider: provider, identityHosts: catalog.identityHosts)
     }
 
-    private enum FixtureError: Error {
-        case missingChatGPT
+    enum FixtureError: Error, Equatable, CustomStringConvertible {
+        case unknownProvider(String)
+
+        var description: String {
+            switch self {
+            case .unknownProvider(let id): return "导航用例引用了不存在的服务商：\(id)。"
+            }
+        }
     }
 }
 
@@ -40,6 +50,7 @@ struct PolicyCases: Decodable {
     struct PanelURLCase: Decodable {
         let id: String
         let group: String
+        let provider: String?
         let url: String?
         let expected: Bool
     }
@@ -47,6 +58,7 @@ struct PolicyCases: Decodable {
     struct ActionCase: Decodable {
         let id: String
         let group: String
+        let provider: String?
         let url: String?
         let topLevel: Bool
         let clickedLink: Bool
@@ -59,6 +71,7 @@ struct PolicyCases: Decodable {
     struct ResponseCase: Decodable {
         let id: String
         let group: String
+        let provider: String?
         let url: String?
         let mainFrame: Bool
         let canDisplay: Bool
@@ -69,8 +82,10 @@ struct PolicyCases: Decodable {
     struct OriginCase: Decodable {
         let id: String
         let group: String
+        let provider: String?
         let url: String?
         let expected: String?
         let excludes: String?
+        let isProviderURL: Bool?
     }
 }
