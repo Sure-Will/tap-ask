@@ -7,6 +7,68 @@ import XCTest
 /// Requires WindowServer. No page is loaded and no JavaScript is injected.
 final class ChatPanelTests: XCTestCase {
     @MainActor
+    func testLoginPopupFailureUsesSharedOverlayAndOnlyOffersSafeRetry() throws {
+        _ = NSApplication.shared
+        let policy = try SharedFixtures.chatGPTPolicy()
+        let cases: [(URL?, Bool)] = [(URL(string: "https://accounts.google.com/login"), true),
+                                    (nil, false), (URL(string: "https://example.invalid/login"), false)]
+        for (initialURL, canRetry) in cases {
+            let configuration = WKWebViewConfiguration()
+            configuration.websiteDataStore = .nonPersistent()
+            let popup = LoginPopup(configuration: configuration, policy: policy, initialURL: initialURL)
+            defer { popup.dispose() }
+            let delegate = try XCTUnwrap(popup.webView.navigationDelegate as? WebViewDelegate)
+            let overlay = try XCTUnwrap(popup.webView.subviews.first { $0 is PageLoadOverlayView })
+            let stack = try XCTUnwrap(overlay.subviews.first as? NSStackView)
+            let labels = stack.views.compactMap { $0 as? NSTextField }
+            let retry = try XCTUnwrap(stack.views.compactMap { $0 as? NSButton }.first)
+            let error = NSError(domain: NSURLErrorDomain, code: NSURLErrorNotConnectedToInternet)
+            delegate.webView(popup.webView, didStartProvisionalNavigation: nil)
+            delegate.webView(popup.webView, didFailProvisionalNavigation: nil, withError: error)
+            XCTAssertFalse(overlay.isHidden)
+            XCTAssertTrue(labels.contains { $0.stringValue == "登录页打不开" })
+            let reason = "没有网络连接" + (canRetry ? "" : "，请关闭后重新登录")
+            XCTAssertTrue(labels.contains { $0.stringValue == reason })
+            XCTAssertEqual(retry.isHidden, !canRetry)
+            for size in [NSSize(width: 480, height: 640), NSSize(width: 360, height: 480)] {
+                popup.panel.setContentSize(size)
+                popup.webView.layoutSubtreeIfNeeded()
+                XCTAssertTrue(popup.webView.bounds.contains(overlay.frame), "The prompt must fit the login window")
+            }
+
+            delegate.webView(popup.webView, didStartProvisionalNavigation: nil)
+            delegate.webView(popup.webView, didCommit: nil)
+            delegate.webView(popup.webView, didStartProvisionalNavigation: nil)
+            delegate.webView(popup.webView, didFailProvisionalNavigation: nil, withError: error)
+            delegate.webView(popup.webView, didFail: nil, withError: error)
+            XCTAssertTrue(overlay.isHidden, "Failures after commit must leave the login document visible")
+        }
+    }
+
+    @MainActor
+    func testLoginPopupShowsDelayedLoadingPromptAndHidesItOnCommit() async throws {
+        _ = NSApplication.shared
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let popup = LoginPopup(configuration: configuration, policy: try SharedFixtures.chatGPTPolicy(),
+                               initialURL: URL(string: "https://accounts.google.com/login"))
+        defer { popup.dispose() }
+        let delegate = try XCTUnwrap(popup.webView.navigationDelegate as? WebViewDelegate)
+        let overlay = try XCTUnwrap(popup.webView.subviews.first { $0 is PageLoadOverlayView })
+        delegate.webView(popup.webView, didStartProvisionalNavigation: nil)
+        XCTAssertTrue(overlay.isHidden)
+        try await Task.sleep(for: .milliseconds(500))
+        XCTAssertFalse(overlay.isHidden)
+        let stack = try XCTUnwrap(overlay.subviews.first as? NSStackView)
+        XCTAssertTrue(stack.views.compactMap { $0 as? NSTextField }
+            .contains { $0.stringValue == "正在打开登录页…" })
+        XCTAssertFalse(try XCTUnwrap(stack.views.compactMap { $0 as? NSProgressIndicator }.first).isHidden)
+        XCTAssertTrue(try XCTUnwrap(stack.views.compactMap { $0 as? NSButton }.first).isHidden)
+        delegate.webView(popup.webView, didCommit: nil)
+        XCTAssertTrue(overlay.isHidden)
+    }
+
+    @MainActor
     func testTopClicksReachWebViewExceptEightPointDragStrip() throws {
         _ = NSApplication.shared
         let suite = "TapAsk.ChatPanelTests.\(UUID().uuidString)"

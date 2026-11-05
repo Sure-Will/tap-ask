@@ -244,7 +244,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         hotKeyStartedAt = nil
     }
 
-    @objc private func reloadPage(_ sender: Any?) { currentSession.reload() }
+    @objc private func reloadPage(_ sender: Any?) {
+        let popupIsKey = loginPopup.map { NSApp.keyWindow === $0.panel } ?? false
+        switch pageReloadTarget(isAppActive: NSApp.isActive, isLoginPopupKeyWindow: popupIsKey) {
+        case .loginPopup: loginPopup?.reload()
+        case .provider: currentSession.reload()
+        }
+    }
+
+    @objc private func reloadProviderPage(_ sender: Any?) { currentSession.reload() }
 
     @objc private func togglePanelFromMenu(_ sender: Any?) { togglePanel() }
 
@@ -297,7 +305,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private func makeCurrentStatusMenu() -> NSMenu {
         makeStatusMenu(isPanelVisible: panel.isVisible, providerItems: makeProviderMenuItems(), target: self,
                        toggleAction: #selector(togglePanelFromMenu(_:)),
-                       orderAction: #selector(showProviderOrder(_:)), reloadAction: #selector(reloadPage(_:)))
+                       orderAction: #selector(showProviderOrder(_:)), reloadAction: #selector(reloadProviderPage(_:)))
     }
 
     private func rebuildProviderMenus() {

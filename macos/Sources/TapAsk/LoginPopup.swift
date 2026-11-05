@@ -8,14 +8,28 @@ final class LoginPopup {
     let panel: LoginPanel
     let webView: WKWebView
     private let webDelegate: WebViewDelegate
+    private let policy: NavigationPolicy
+    private let initialURL: URL?
+    private let pageLoadOverlay = PageLoadOverlayView()
     var onClose: (() -> Void)?
 
     init(configuration: WKWebViewConfiguration, policy: NavigationPolicy, initialURL: URL?) {
+        self.policy = policy
+        self.initialURL = initialURL
         webDelegate = WebViewDelegate(policy: policy, isPopup: true)
         webView = webDelegate.makeWebView(configuration: configuration)
         panel = LoginPanel()
         panel.title = NavigationPolicy.origin(initialURL)
         panel.contentView = webView
+        pageLoadOverlay.translatesAutoresizingMaskIntoConstraints = false
+        webView.addSubview(pageLoadOverlay, positioned: .above, relativeTo: nil)
+        NSLayoutConstraint.activate([
+            pageLoadOverlay.centerXAnchor.constraint(equalTo: webView.centerXAnchor),
+            pageLoadOverlay.centerYAnchor.constraint(equalTo: webView.centerYAnchor),
+            pageLoadOverlay.widthAnchor.constraint(lessThanOrEqualTo: webView.widthAnchor, constant: -32),
+        ])
+        pageLoadOverlay.onRetry = { [weak self] in self?.reload() }
+        webDelegate.onLoadStateChange = { [weak self] state in self?.updateLoadState(state) }
         panel.onCancel = { [weak self] in self?.onClose?() }
         webDelegate.onClose = { [weak self] in self?.onClose?() }
         webDelegate.onCommit = { [weak self] url in
@@ -36,10 +50,27 @@ final class LoginPopup {
 
     func hide() { panel.orderOut(nil) }
 
+    /// Never reload the last request: it may be a POST or a one-time OAuth callback.
+    func reload() {
+        guard let url = loginPopupRetryURL(initialURL: initialURL, policy: policy) else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        webView.load(request)
+    }
+
+    private func updateLoadState(_ state: PageLoadState) {
+        pageLoadOverlay.update(state, loadingMessage: "正在打开登录页…", failureMessage: "登录页打不开",
+                               canRetry: loginPopupRetryURL(initialURL: initialURL, policy: policy) != nil)
+    }
+
     func dispose() {
         onClose = nil
         webDelegate.onClose = nil
         webDelegate.onCommit = nil
+        webDelegate.onLoadStateChange = nil
+        pageLoadOverlay.onRetry = nil
+        updateLoadState(.idle)
+        pageLoadOverlay.removeFromSuperview()
         webView.stopLoading()
         webView.navigationDelegate = nil
         webView.uiDelegate = nil

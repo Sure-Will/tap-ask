@@ -106,7 +106,6 @@ final class WebViewDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
 
     private func updateLoadState(_ event: PageLoadEvent) {
-        guard !isPopup else { return }
         let next = nextPageLoadState(from: loadState, on: event)
         guard next != loadState else { return }
         loadState = next
@@ -114,13 +113,13 @@ final class WebViewDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
     }
 
     private func handleLoadFailure(_ error: NSError, in webView: WKWebView) {
-        guard !isPopup else { return }
         let url = (error.userInfo[NSURLErrorFailingURLErrorKey] as? URL)
             ?? (error.userInfo[NSURLErrorFailingURLStringErrorKey] as? String).flatMap { URL(string: $0) }
             ?? webView.url
         let host = url?.host?.lowercased() ?? "<none>"
         let result: NavigationPolicy.Decision = policy.isPanelURL(url) ? .allow : .cancel
-        AppLog.navigation.error("provider=\(self.policy.provider.id, privacy: .public) phase=main-fail host=\(host, privacy: .public) policy=\(result.rawValue, privacy: .public) domain=\(error.domain, privacy: .public) code=\(error.code, privacy: .public)")
+        let scope = isPopup ? "popup" : "main"
+        AppLog.navigation.error("provider=\(self.policy.provider.id, privacy: .public) phase=\(scope, privacy: .public)-fail host=\(host, privacy: .public) policy=\(result.rawValue, privacy: .public) domain=\(error.domain, privacy: .public) code=\(error.code, privacy: .public)")
         updateLoadState(.fail(domain: error.domain, code: error.code))
     }
 

@@ -120,6 +120,43 @@ final class LifecycleTests: XCTestCase {
     }
 
     @MainActor
+    func testClosingLoginPopupReleasesItAndItsOverlayDuringLoadingDelay() async throws {
+        _ = NSApplication.shared
+        let suite = "TapAsk.LifecycleTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let policy = NavigationPolicy(provider: try localCatalog().providers[0], identityHosts: [])
+        let owner = AppDelegate()
+        owner.configurePanel(defaults: defaults)
+        defer { owner.panel.orderOut(nil) }
+        weak var popup: LoginPopup?
+        weak var overlay: PageLoadOverlayView?
+        try autoreleasepool {
+            let configuration = WKWebViewConfiguration()
+            configuration.websiteDataStore = .nonPersistent()
+            let page = owner.openLoginPopup(configuration: configuration, policy: policy, initialURL: nil)
+            popup = try XCTUnwrap(owner.loginPopup)
+            overlay = try XCTUnwrap(page.subviews.compactMap { $0 as? PageLoadOverlayView }.first)
+            let delegate = try XCTUnwrap(page.navigationDelegate as? WebViewDelegate)
+            delegate.webView(page, didStartProvisionalNavigation: nil)
+        }
+        let taskStarted = expectation(description: "Popup loading task entered its delay")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { taskStarted.fulfill() }
+        await fulfillment(of: [taskStarted], timeout: 0.3)
+        XCTAssertEqual(overlay?.isHidden, true)
+        autoreleasepool { owner.closeLoginPopup(restoreFocus: false) }
+        XCTAssertNil(popup, "Overlay callbacks must not retain the popup")
+        XCTAssertNil(overlay, "The loading task must not retain the popup overlay during its delay")
+        let delayExpired = expectation(description: "Popup loading delay expired")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { delayExpired.fulfill() }
+        await fulfillment(of: [delayExpired], timeout: 1)
+        XCTAssertNil(popup)
+        XCTAssertNil(overlay)
+        XCTAssertNil(owner.loginPopup)
+        withExtendedLifetime(owner) {}
+    }
+
+    @MainActor
     func testMenusDoNotKeepActionTargetAlive() throws {
         let providers = try localCatalog().providers
         let mainMenu = NSMenu()
@@ -178,6 +215,7 @@ final class LifecycleTests: XCTestCase {
         weak var window: LoginPanel?
         weak var webView: WKWebView?
         weak var delegate: WebViewDelegate?
+        weak var overlay: PageLoadOverlayView?
         try autoreleasepool {
             let configuration = WKWebViewConfiguration()
             configuration.websiteDataStore = .nonPersistent()
@@ -188,6 +226,7 @@ final class LifecycleTests: XCTestCase {
             window = ownedPopup.panel
             webView = page
             delegate = try XCTUnwrap(page.navigationDelegate as? WebViewDelegate)
+            overlay = try XCTUnwrap(page.subviews.compactMap { $0 as? PageLoadOverlayView }.first)
             loadLocalPage(page, provider: policy.provider)
             ownedPopup.show(relativeTo: parent)
             XCTAssertTrue(parent.childWindows?.contains { $0 === ownedPopup.panel } == true, file: file, line: line)
@@ -197,12 +236,16 @@ final class LifecycleTests: XCTestCase {
             XCTAssertNil(ownedPopup.panel.contentView, file: file, line: line)
             XCTAssertNil(page.navigationDelegate, file: file, line: line)
             XCTAssertNil(page.uiDelegate, file: file, line: line)
+            XCTAssertNil(delegate?.onLoadStateChange, file: file, line: line)
+            XCTAssertNil(overlay?.onRetry, file: file, line: line)
+            XCTAssertNil(overlay?.superview, file: file, line: line)
         }
-        advanceMainRunLoop(until: { popup == nil && window == nil && webView == nil && delegate == nil })
+        advanceMainRunLoop(until: { popup == nil && window == nil && webView == nil && delegate == nil && overlay == nil })
         XCTAssertNil(popup, file: file, line: line)
         XCTAssertNil(window, file: file, line: line)
         XCTAssertNil(webView, file: file, line: line)
         XCTAssertNil(delegate, file: file, line: line)
+        XCTAssertNil(overlay, file: file, line: line)
         if expectReplacement { XCTAssertNotNil(owner.loginPopup, file: file, line: line) }
         else { XCTAssertNil(owner.loginPopup, file: file, line: line) }
         withExtendedLifetime((owner, parent)) {}

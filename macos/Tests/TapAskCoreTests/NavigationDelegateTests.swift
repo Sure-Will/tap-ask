@@ -7,6 +7,110 @@ import WebKit
 /// Real WebKit callbacks use no window, persistent login data, or network load.
 final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
     @MainActor
+    func testMainAndPopupDelegatesTrackTheSameLoadEvents() throws {
+        _ = NSApplication.shared
+        for isPopup in [false, true] {
+            let delegate = WebViewDelegate(policy: try SharedFixtures.chatGPTPolicy(), isPopup: isPopup)
+            let configuration = WKWebViewConfiguration()
+            configuration.websiteDataStore = .nonPersistent()
+            let webView = delegate.makeWebView(configuration: configuration)
+            defer { stop(webView) }
+            var changes: [PageLoadState] = []
+            delegate.onLoadStateChange = { changes.append($0) }
+            let ignored = [NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled),
+                           NSError(domain: "WebKitErrorDomain", code: 102),
+                           NSError(domain: "WebKitErrorDomain", code: 204)]
+            for code in [NSURLErrorNotConnectedToInternet, NSURLErrorCannotFindHost, NSURLErrorTimedOut] {
+                delegate.webView(webView, didStartProvisionalNavigation: nil)
+                for error in ignored {
+                    delegate.webView(webView, didFailProvisionalNavigation: nil, withError: error)
+                    delegate.webView(webView, didFail: nil, withError: error)
+                }
+                XCTAssertEqual(changes.last, .loading)
+                let error = NSError(domain: NSURLErrorDomain, code: code)
+                delegate.webView(webView, didFailProvisionalNavigation: nil, withError: error)
+                XCTAssertEqual(changes.last, .failed(PageLoadFailure(domain: error.domain, code: code)))
+            }
+            XCTAssertEqual(changes.count, 6, "Only starts and real failures should notify the owner")
+            delegate.webView(webView, didStartProvisionalNavigation: nil)
+            delegate.webView(webView, didCommit: nil)
+            delegate.webView(webView, didStartProvisionalNavigation: nil)
+            let error = NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut)
+            delegate.webView(webView, didFailProvisionalNavigation: nil, withError: error)
+            delegate.webView(webView, didFail: nil, withError: error)
+            XCTAssertEqual(changes.count, 8)
+            XCTAssertEqual(changes.last, .loaded, "Later failures must preserve the committed page")
+        }
+    }
+
+    @MainActor
+    func testPopupRetryUsesInitialGETInsteadOfTheLastPOST() async throws {
+        _ = NSApplication.shared
+        let initialURL = try XCTUnwrap(URL(string: "https://accounts.google.com/authorize?state=fixture"))
+        let callbackURL = try XCTUnwrap(URL(string: "https://chatgpt.com/callback?code=one-time-fixture"))
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let popup = LoginPopup(configuration: configuration, policy: try SharedFixtures.chatGPTPolicy(),
+                               initialURL: initialURL)
+        defer { popup.dispose() }
+        let delegate = try XCTUnwrap(popup.webView.navigationDelegate as? WebViewDelegate)
+        let harness = NavigationHarness()
+        popup.webView.navigationDelegate = harness
+        let postObserved = expectation(description: "Last POST intercepted")
+        let retryObserved = expectation(description: "Retry GET intercepted")
+        var requests: [URLRequest] = []
+        harness.action = { action, handler in
+            requests.append(action.request)
+            handler(.cancel) // Inspect real requests without sending OAuth fixtures over the network.
+            if requests.count == 1 { postObserved.fulfill() }
+            else { retryObserved.fulfill() }
+        }
+        var post = URLRequest(url: callbackURL)
+        post.httpMethod = "POST"
+        post.httpBody = Data("code=one-time-fixture".utf8)
+        popup.webView.load(post)
+        await fulfillment(of: [postObserved], timeout: 3)
+
+        delegate.webView(popup.webView, didStartProvisionalNavigation: nil)
+        delegate.webView(popup.webView, didFailProvisionalNavigation: nil,
+                         withError: NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut))
+        let overlay = try XCTUnwrap(popup.webView.subviews.first { $0 is PageLoadOverlayView })
+        let stack = try XCTUnwrap(overlay.subviews.first as? NSStackView)
+        let retry = try XCTUnwrap(stack.views.compactMap { $0 as? NSButton }.first)
+        XCTAssertFalse(retry.isHidden)
+        retry.performClick(nil) // Exercise the real button's weak callback to LoginPopup.reload().
+        await fulfillment(of: [retryObserved], timeout: 3)
+        XCTAssertEqual(requests.compactMap(\.url), [callbackURL, initialURL])
+        XCTAssertEqual(requests.map(\.httpMethod), ["POST", "GET"])
+        XCTAssertNil(requests.last?.httpBody)
+        XCTAssertNil(requests.last?.httpBodyStream)
+        withExtendedLifetime(harness) {}
+    }
+
+    @MainActor
+    func testPopupReloadDoesNothingWithoutAnAllowedInitialURL() async throws {
+        _ = NSApplication.shared
+        for initialURL in [nil, URL(string: "https://example.invalid/login")] {
+            let configuration = WKWebViewConfiguration()
+            configuration.websiteDataStore = .nonPersistent()
+            let popup = LoginPopup(configuration: configuration, policy: try SharedFixtures.chatGPTPolicy(),
+                                   initialURL: initialURL)
+            defer { popup.dispose() }
+            let harness = NavigationHarness()
+            let unexpectedLoad = expectation(description: "No fallback or reload without an allowed initial URL")
+            unexpectedLoad.isInverted = true
+            harness.action = { _, handler in
+                handler(.cancel)
+                unexpectedLoad.fulfill()
+            }
+            popup.webView.navigationDelegate = harness
+            popup.reload()
+            await fulfillment(of: [unexpectedLoad], timeout: 0.5)
+            withExtendedLifetime(harness) {}
+        }
+    }
+
+    @MainActor
     func testProgrammaticExternalNavigationIsCancelledByRealDelegate() async throws {
         let delegate = WebViewDelegate(policy: try SharedFixtures.chatGPTPolicy())
         let harness = NavigationHarness()
