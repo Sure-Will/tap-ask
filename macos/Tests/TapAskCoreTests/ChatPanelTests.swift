@@ -7,6 +7,52 @@ import XCTest
 /// Requires WindowServer. No page is loaded and no JavaScript is injected.
 final class ChatPanelTests: XCTestCase {
     @MainActor
+    func testLoginPopupToolbarFitsWithoutIncreasingWindowHeight() throws {
+        _ = NSApplication.shared
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let popup = LoginPopup(configuration: configuration, policy: try SharedFixtures.chatGPTPolicy(),
+                               initialURL: URL(string: "https://accounts.google.com/login"))
+        defer { popup.dispose() }
+        XCTAssertEqual(popup.panel.frame.size, LoginPanel.initialSize)
+        let content = try XCTUnwrap(popup.panel.contentView)
+        let toolbar = try XCTUnwrap(popup.completionButton.superview)
+        for size in [LoginPanel.initialSize, NSSize(width: 360, height: 480)] {
+            popup.panel.setFrame(NSRect(origin: .zero, size: size), display: false)
+            content.layoutSubtreeIfNeeded()
+            XCTAssertEqual(popup.panel.frame.size, size)
+            XCTAssertEqual(toolbar.frame.height, 36, accuracy: 0.5)
+            XCTAssertEqual(toolbar.frame.minY, content.bounds.minY, accuracy: 0.5)
+            XCTAssertEqual(popup.webView.frame.minY, toolbar.frame.maxY, accuracy: 0.5)
+            XCTAssertEqual(popup.webView.frame.maxY, content.bounds.maxY, accuracy: 0.5)
+            XCTAssertEqual(popup.webView.frame.width, content.bounds.width, accuracy: 0.5)
+            XCTAssertTrue(toolbar.bounds.contains(popup.completionButton.frame))
+            XCTAssertGreaterThanOrEqual(popup.completionButton.frame.width,
+                                       popup.completionButton.intrinsicContentSize.width)
+            XCTAssertLessThanOrEqual(popup.hostLabel.frame.maxX, popup.completionButton.frame.minX - 12)
+            XCTAssertEqual(popup.completionButton.keyEquivalent, "", "Return must remain available to the login form")
+        }
+    }
+
+    @MainActor
+    func testLoginPopupHostLabelFollowsCommittedNavigation() throws {
+        _ = NSApplication.shared
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let popup = LoginPopup(configuration: configuration, policy: try SharedFixtures.chatGPTPolicy(),
+                               initialURL: URL(string: "https://accounts.google.com/login?state=fixture"))
+        defer { popup.dispose() }
+        XCTAssertEqual(popup.hostLabel.stringValue, "accounts.google.com")
+        let delegate = try XCTUnwrap(popup.webView.navigationDelegate as? WebViewDelegate)
+        delegate.onCommit?(URL(string: "https://chatgpt.com/callback?code=fixture"))
+        XCTAssertEqual(popup.hostLabel.stringValue, "chatgpt.com")
+        XCTAssertEqual(popup.hostLabel.toolTip, "chatgpt.com")
+        delegate.onCommit?(nil)
+        XCTAssertEqual(popup.hostLabel.stringValue, "")
+        XCTAssertNil(popup.hostLabel.toolTip)
+    }
+
+    @MainActor
     func testLoginPopupIsPlacedInsideParentScreenAndFocusIsRetriedNextTurn() async throws {
         _ = NSApplication.shared
         guard let screen = NSScreen.main else {

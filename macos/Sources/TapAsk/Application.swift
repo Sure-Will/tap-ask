@@ -149,7 +149,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     private func switchProvider(to provider: Provider) {
         if let currentSession, currentSession.policy.provider.id == provider.id {
-            if case .failed = currentSession.loadState { currentSession.loadHome() }
+            currentSession.prepareForDisplay()
             return
         }
         closeLoginPopup(restoreFocus: false)
@@ -158,10 +158,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         displaySession(session)
         UserDefaults.standard.set(provider.id, forKey: "LastProviderID")
         if existing == nil { session.loadInitialPage() }
-        else if case .failed = session.loadState { session.loadHome() }
     }
 
-    /// Shared assembly path; loading is separate so local lifecycle fixtures need no network.
+    /// Shared assembly path; initial loading is separate so idle lifecycle fixtures need no network.
     func displaySession(_ session: ProviderSession) {
         sessions[session.policy.provider.id] = session
         currentSession = session
@@ -170,6 +169,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         panel.updateLoadState(session.loadState, providerName: session.policy.provider.name)
         if panel.isVisible, !NSApp.isHidden { panel.makeKeyAndOrderFront(nil) }
         panel.makeFirstResponder(session.webView)
+        session.prepareForDisplay()
     }
 
     /// Termination releases both the visible page and the cached background pages.
@@ -210,6 +210,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let popup = LoginPopup(configuration: configuration, policy: policy, initialURL: initialURL)
         loginPopup = popup
         popup.onClose = { [weak self] in self?.closeLoginPopup() }
+        let openingProviderID = policy.provider.id
+        popup.onComplete = { [weak self] in
+            guard let self else { return }
+            self.closeLoginPopup()
+            switch loginPopupCompletionReload(openingProviderID: openingProviderID,
+                                               displayedProviderID: self.currentSession?.policy.provider.id) {
+            case let .now(providerID):
+                self.sessions[providerID]?.reload()
+            case let .onNextDisplay(providerID):
+                self.sessions[providerID]?.needsReloadOnDisplay = true
+            }
+        }
         popup.panel.onBecomeKey = { [weak self] in self?.recordKeyLatency() }
         // A request can complete after the user has hidden the app; keep that popup hidden too.
         if panel.isVisible, !NSApp.isHidden {

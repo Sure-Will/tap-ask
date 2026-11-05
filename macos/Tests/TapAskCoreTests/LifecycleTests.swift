@@ -7,6 +7,11 @@ import XCTest
 /// Requires WindowServer/WebKit. Fixtures use only in-memory HTML and isolated stores/defaults.
 final class LifecycleTests: XCTestCase {
     @MainActor
+    func testCompletionButtonReleasesLoginPopupAndItsWebView() throws {
+        try assertPopupReleased { _, popup in popup.completionButton.performClick(nil) }
+    }
+
+    @MainActor
     func testCloseButtonReleasesLoginPopupAndDetachesChildWindow() throws {
         try assertPopupReleased { _, popup in popup.panel.performClose(nil) }
     }
@@ -278,6 +283,9 @@ final class LifecycleTests: XCTestCase {
             XCTAssertNil(page.navigationDelegate, file: file, line: line)
             XCTAssertNil(page.uiDelegate, file: file, line: line)
             XCTAssertNil(delegate?.onLoadStateChange, file: file, line: line)
+            XCTAssertNil(ownedPopup.onComplete, file: file, line: line)
+            XCTAssertNil(ownedPopup.completionButton.target, file: file, line: line)
+            XCTAssertNil(ownedPopup.completionButton.action, file: file, line: line)
             XCTAssertNil(overlay?.onRetry, file: file, line: line)
             XCTAssertNil(overlay?.superview, file: file, line: line)
         }

@@ -4,9 +4,11 @@ import WebKit
 
 /// Owns one temporary login window. WebKit, not this owner, starts its initial navigation.
 @MainActor
-final class LoginPopup {
+final class LoginPopup: NSObject {
     let panel: LoginPanel
     let webView: WKWebView
+    let hostLabel = NSTextField(labelWithString: "")
+    let completionButton = NSButton(title: "完成，回到主窗口", target: nil, action: nil)
     private let webDelegate: WebViewDelegate
     private let policy: NavigationPolicy
     private let initialURL: URL?
@@ -14,6 +16,7 @@ final class LoginPopup {
     private let navigationNotice = NavigationNoticeView()
     private var placement = LoginPopupPlacement()
     var onClose: (() -> Void)?
+    var onComplete: (() -> Void)?
 
     init(configuration: WKWebViewConfiguration, policy: NavigationPolicy, initialURL: URL?) {
         self.policy = policy
@@ -21,8 +24,10 @@ final class LoginPopup {
         webDelegate = WebViewDelegate(policy: policy, isPopup: true)
         webView = webDelegate.makeWebView(configuration: configuration)
         panel = LoginPanel()
+        super.init()
         panel.title = NavigationPolicy.origin(initialURL)
-        panel.contentView = webView
+        installContent()
+        updateHostLabel(initialURL)
         pageLoadOverlay.translatesAutoresizingMaskIntoConstraints = false
         webView.addSubview(pageLoadOverlay, positioned: .above, relativeTo: nil)
         navigationNotice.translatesAutoresizingMaskIntoConstraints = false
@@ -43,8 +48,64 @@ final class LoginPopup {
         webDelegate.onClose = { [weak self] in self?.onClose?() }
         webDelegate.onCommit = { [weak self] url in
             self?.panel.title = NavigationPolicy.origin(url)
+            self?.updateHostLabel(url)
         }
     }
+
+    private func installContent() {
+        let content = NSView()
+        let toolbar = NSView()
+        let separator = NSBox()
+        separator.boxType = .separator
+        hostLabel.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        hostLabel.textColor = .secondaryLabelColor
+        hostLabel.usesSingleLineMode = true
+        hostLabel.lineBreakMode = .byClipping
+        hostLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        completionButton.bezelStyle = .rounded
+        completionButton.controlSize = .small
+        completionButton.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        completionButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+        completionButton.target = self
+        completionButton.action = #selector(completeLogin)
+        panel.contentView = content
+        for view in [webView, toolbar] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            content.addSubview(view)
+        }
+        for view in [separator, hostLabel, completionButton] {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            toolbar.addSubview(view)
+        }
+        NSLayoutConstraint.activate([
+            webView.topAnchor.constraint(equalTo: content.topAnchor),
+            webView.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            webView.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            webView.bottomAnchor.constraint(equalTo: toolbar.topAnchor),
+            toolbar.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            toolbar.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            toolbar.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            toolbar.heightAnchor.constraint(equalToConstant: 36),
+            separator.topAnchor.constraint(equalTo: toolbar.topAnchor),
+            separator.leadingAnchor.constraint(equalTo: toolbar.leadingAnchor),
+            separator.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor),
+            separator.heightAnchor.constraint(equalToConstant: 1),
+            hostLabel.leadingAnchor.constraint(equalTo: toolbar.leadingAnchor, constant: 12),
+            hostLabel.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
+            hostLabel.trailingAnchor.constraint(lessThanOrEqualTo: completionButton.leadingAnchor, constant: -12),
+            hostLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 0),
+            completionButton.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor, constant: -12),
+            completionButton.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
+        ])
+    }
+
+    private func updateHostLabel(_ url: URL?) {
+        let host = loginPopupHostLabel(for: url)
+        hostLabel.stringValue = host
+        hostLabel.toolTip = host.isEmpty ? nil : host
+    }
+
+    @objc private func completeLogin() { onComplete?() }
 
     func show(relativeTo parent: NSWindow) {
         let center = NSPoint(x: parent.frame.midX, y: parent.frame.midY)
@@ -88,6 +149,9 @@ final class LoginPopup {
 
     func dispose() {
         onClose = nil
+        onComplete = nil
+        completionButton.target = nil
+        completionButton.action = nil
         webDelegate.onClose = nil
         webDelegate.onCommit = nil
         webDelegate.onLoadStateChange = nil
@@ -142,7 +206,7 @@ final class LoginPanel: NSPanel, NSWindowDelegate {
     // setFrame calls or the child following its parent to another display.
     func windowWillMove(_ notification: Notification) { onUserAdjustFrame?() }
     func windowWillStartLiveResize(_ notification: Notification) { onUserAdjustFrame?() }
-    /// The close button or the page's window.close() ends the popup; Esc does not.
+    /// Explicit completion, the close button or window.close() ends the popup; Esc does not.
     override func cancelOperation(_ sender: Any?) {}
 
     override func close() {

@@ -10,6 +10,7 @@ final class ProviderSession {
     let webView: WKWebView
     private let defaults: UserDefaults
     private var restoringLastPage = false
+    var needsReloadOnDisplay = false
     private(set) var loadState: PageLoadState = .idle
     var onLoadStateChange: ((PageLoadState) -> Void)?
     var onCommit: (() -> Void)?
@@ -58,6 +59,7 @@ final class ProviderSession {
     }
 
     func reload() {
+        needsReloadOnDisplay = false
         if case .failed = loadState {
             loadHome()
         } else if webView.url == nil {
@@ -65,6 +67,11 @@ final class ProviderSession {
         } else {
             webView.reload()
         }
+    }
+
+    func prepareForDisplay() {
+        if needsReloadOnDisplay { reload() }
+        else if case .failed = loadState { loadHome() }
     }
 
     var title: String {

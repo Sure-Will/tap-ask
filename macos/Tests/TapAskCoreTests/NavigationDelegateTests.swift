@@ -7,6 +7,124 @@ import WebKit
 /// Real WebKit callbacks use no window, persistent login data, or network load.
 final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
     @MainActor
+    func testPopupCompletionReloadsOnlyItsOpenerOnceNowOrOnNextDisplay() async throws {
+        _ = NSApplication.shared
+        let catalog = try SharedFixtures.catalog()
+        for switchAway in [false, true] {
+            let suite = "TapAsk.CompletionTests.\(UUID().uuidString)"
+            let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+            defer { defaults.removePersistentDomain(forName: suite) }
+            let owner = AppDelegate()
+            owner.configurePanel(defaults: defaults)
+            defer {
+                owner.closeLoginPopup(restoreFocus: false)
+                owner.removeAllSessions()
+                owner.panel.orderOut(nil)
+            }
+            let opener = ProviderSession(provider: catalog.providers[0], identityHosts: catalog.identityHosts,
+                                         defaults: defaults, websiteDataStore: .nonPersistent())
+            let other = ProviderSession(provider: catalog.providers[1], identityHosts: catalog.identityHosts,
+                                        defaults: defaults, websiteDataStore: .nonPersistent())
+            let openerHarness = NavigationHarness()
+            let otherHarness = NavigationHarness()
+            opener.webView.navigationDelegate = openerHarness
+            other.webView.navigationDelegate = otherHarness
+            let reloaded = expectation(description: "Only the opener is reloaded")
+            let unexpected = expectation(description: "No other provider or duplicate reload")
+            unexpected.isInverted = true
+            let premature = switchAway
+                ? expectation(description: "No reload before the background opener is shown") : nil
+            premature?.isInverted = true
+            var reloadAllowed = !switchAway
+            var requests: [URLRequest] = []
+            openerHarness.action = { action, handler in
+                handler(.cancel) // Observe requests without contacting the real providers.
+                requests.append(action.request)
+                if !reloadAllowed { premature?.fulfill() }
+                if requests.count == 1 { reloaded.fulfill() }
+                else { unexpected.fulfill() }
+            }
+            otherHarness.action = { _, handler in
+                handler(.cancel)
+                unexpected.fulfill()
+            }
+            owner.displaySession(other)
+            owner.displaySession(opener)
+            let configuration = WKWebViewConfiguration()
+            configuration.websiteDataStore = .nonPersistent()
+            _ = owner.openLoginPopup(configuration: configuration, policy: opener.policy, initialURL: nil)
+            let popup = try XCTUnwrap(owner.loginPopup)
+            if switchAway {
+                // Exercise a changed displayed session while retaining the popup.
+                // Normal menu switching still closes it, as before.
+                owner.displaySession(other)
+            }
+            popup.completionButton.performClick(nil)
+            XCTAssertNil(owner.loginPopup)
+            XCTAssertFalse(other.needsReloadOnDisplay)
+            if switchAway {
+                XCTAssertTrue(owner.panel.contentView === other.webView)
+                XCTAssertTrue(opener.needsReloadOnDisplay)
+                await fulfillment(of: [try XCTUnwrap(premature)], timeout: 0.2)
+                XCTAssertTrue(requests.isEmpty)
+                reloadAllowed = true
+                owner.displaySession(opener)
+            }
+            await fulfillment(of: [reloaded], timeout: 3)
+            XCTAssertEqual(requests.compactMap(\.url), [opener.policy.provider.home])
+            XCTAssertFalse(opener.needsReloadOnDisplay)
+            XCTAssertTrue(owner.panel.contentView === opener.webView)
+            owner.displaySession(other)
+            owner.displaySession(opener)
+            await fulfillment(of: [unexpected], timeout: 0.2)
+            withExtendedLifetime((openerHarness, otherHarness)) {}
+        }
+    }
+
+    @MainActor
+    func testWindowAndWebKitCloseDoNotReloadTheProvider() async throws {
+        _ = NSApplication.shared
+        let suite = "TapAsk.CompletionTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let policy = try SharedFixtures.chatGPTPolicy()
+        let owner = AppDelegate()
+        owner.configurePanel(defaults: defaults)
+        defer {
+            owner.closeLoginPopup(restoreFocus: false)
+            owner.removeAllSessions()
+            owner.panel.orderOut(nil)
+        }
+        let session = ProviderSession(provider: policy.provider, identityHosts: [], defaults: defaults,
+                                      websiteDataStore: .nonPersistent())
+        let harness = NavigationHarness()
+        session.webView.navigationDelegate = harness
+        let unexpected = expectation(description: "Closing without completion must not reload")
+        unexpected.isInverted = true
+        harness.action = { _, handler in
+            handler(.cancel)
+            unexpected.fulfill()
+        }
+        owner.displaySession(session)
+        for webKitClose in [false, true] {
+            let configuration = WKWebViewConfiguration()
+            configuration.websiteDataStore = .nonPersistent()
+            _ = owner.openLoginPopup(configuration: configuration, policy: policy, initialURL: nil)
+            let popup = try XCTUnwrap(owner.loginPopup)
+            if webKitClose {
+                let delegate = try XCTUnwrap(popup.webView.uiDelegate as? WebViewDelegate)
+                delegate.webViewDidClose(popup.webView)
+            } else {
+                popup.panel.performClose(nil)
+            }
+            XCTAssertNil(owner.loginPopup)
+            XCTAssertFalse(session.needsReloadOnDisplay)
+        }
+        await fulfillment(of: [unexpected], timeout: 0.2)
+        withExtendedLifetime(harness) {}
+    }
+
+    @MainActor
     func testMainAndPopupDelegatesTrackTheSameLoadEvents() throws {
         _ = NSApplication.shared
         for isPopup in [false, true] {
