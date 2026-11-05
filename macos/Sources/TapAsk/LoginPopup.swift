@@ -12,6 +12,7 @@ final class LoginPopup {
     private let initialURL: URL?
     private let pageLoadOverlay = PageLoadOverlayView()
     private let navigationNotice = NavigationNoticeView()
+    private var placement = LoginPopupPlacement()
     var onClose: (() -> Void)?
 
     init(configuration: WKWebViewConfiguration, policy: NavigationPolicy, initialURL: URL?) {
@@ -38,6 +39,7 @@ final class LoginPopup {
         webDelegate.onLoadStateChange = { [weak self] state in self?.updateLoadState(state) }
         webDelegate.onNavigationNotice = { [weak self] notice in self?.navigationNotice.show(notice) }
         panel.onCancel = { [weak self] in self?.onClose?() }
+        panel.onUserAdjustFrame = { [weak self] in self?.placement.userDidAdjustFrame() }
         webDelegate.onClose = { [weak self] in self?.onClose?() }
         webDelegate.onCommit = { [weak self] url in
             self?.panel.title = NavigationPolicy.origin(url)
@@ -45,12 +47,26 @@ final class LoginPopup {
     }
 
     func show(relativeTo parent: NSWindow) {
+        let center = NSPoint(x: parent.frame.midX, y: parent.frame.midY)
+        if let screen = NSScreen.screens.first(where: { $0.frame.contains(center) }) ?? NSScreen.main,
+           let frame = placement.frameForPresentation(parentFrame: parent.frame, desiredSize: LoginPanel.initialSize,
+                                                       screenFrame: screen.frame, visibleFrame: screen.visibleFrame) {
+            // Very small displays must also be allowed below AppKit's usual minimum.
+            panel.minSize = NSSize(width: min(360, frame.width), height: min(480, frame.height))
+            panel.setFrame(frame, display: false)
+        }
         if panel.parent == nil {
-            // Center horizontally and align the top edges, above the main window's center.
-            panel.setFrameOrigin(NSPoint(x: parent.frame.midX - panel.frame.width / 2,
-                                         y: parent.frame.maxY - panel.frame.height))
             parent.addChildWindow(panel, ordered: .above)
         }
+        focusWebView()
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.panel.isVisible, !NSApp.isHidden, !self.panel.isKeyWindow else { return }
+            self.focusWebView()
+        }
+    }
+
+    private func focusWebView() {
+        NSApp.activate()
         panel.makeKeyAndOrderFront(nil)
         panel.makeFirstResponder(webView)
     }
@@ -87,6 +103,7 @@ final class LoginPopup {
         panel.parent?.removeChildWindow(panel)
         panel.onCancel = nil
         panel.onBecomeKey = nil
+        panel.onUserAdjustFrame = nil
         panel.contentView = nil
         panel.close()
     }
@@ -94,11 +111,13 @@ final class LoginPopup {
 
 @MainActor
 final class LoginPanel: NSPanel, NSWindowDelegate {
+    static let initialSize = NSSize(width: 480, height: 640)
     var onCancel: (() -> Void)?
     var onBecomeKey: (() -> Void)?
+    var onUserAdjustFrame: (() -> Void)?
 
     init() {
-        super.init(contentRect: NSRect(x: 0, y: 0, width: 480, height: 640),
+        super.init(contentRect: NSRect(origin: .zero, size: Self.initialSize),
                    styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         titleVisibility = .visible
         titlebarAppearsTransparent = true
@@ -111,7 +130,7 @@ final class LoginPanel: NSPanel, NSWindowDelegate {
         animationBehavior = .none
         isReleasedWhenClosed = false
         minSize = NSSize(width: 360, height: 480)
-        setFrame(NSRect(x: 0, y: 0, width: 480, height: 640), display: false)
+        setFrame(NSRect(origin: .zero, size: Self.initialSize), display: false)
         delegate = self
     }
 
@@ -119,6 +138,10 @@ final class LoginPanel: NSPanel, NSWindowDelegate {
     override var canBecomeMain: Bool { true }
 
     func windowDidBecomeKey(_ notification: Notification) { onBecomeKey?() }
+    // Unlike didMove/didResize, these mark interactive changes rather than our
+    // setFrame calls or the child following its parent to another display.
+    func windowWillMove(_ notification: Notification) { onUserAdjustFrame?() }
+    func windowWillStartLiveResize(_ notification: Notification) { onUserAdjustFrame?() }
     /// The close button or the page's window.close() ends the popup; Esc does not.
     override func cancelOperation(_ sender: Any?) {}
 

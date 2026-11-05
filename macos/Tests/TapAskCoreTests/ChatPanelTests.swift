@@ -7,6 +7,97 @@ import XCTest
 /// Requires WindowServer. No page is loaded and no JavaScript is injected.
 final class ChatPanelTests: XCTestCase {
     @MainActor
+    func testLoginPopupIsPlacedInsideParentScreenAndFocusIsRetriedNextTurn() async throws {
+        _ = NSApplication.shared
+        guard let screen = NSScreen.main else {
+            throw XCTSkip("Requires a WindowServer screen for native placement and key-window focus")
+        }
+        let parent = NSWindow(contentRect: NSRect(x: screen.visibleFrame.minX, y: screen.visibleFrame.minY,
+                                                  width: 480, height: 480),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        parent.isReleasedWhenClosed = false
+        defer { parent.close() }
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let popup = LoginPopup(configuration: configuration, policy: try SharedFixtures.chatGPTPolicy(), initialURL: nil)
+        defer { popup.dispose() }
+        let parentFrame = parent.frame
+
+        popup.show(relativeTo: parent)
+        XCTAssertTrue(screen.visibleFrame.contains(popup.panel.frame))
+        XCTAssertEqual(parent.frame, parentFrame, "Presenting the popup must not reposition its parent")
+        XCTAssertTrue(popup.panel.firstResponder === popup.webView)
+        // Reproduce losing key status during activation before the queued repair.
+        popup.panel.resignKey()
+        popup.panel.makeFirstResponder(nil)
+        XCTAssertFalse(popup.panel.isKeyWindow)
+        XCTAssertFalse(popup.panel.firstResponder === popup.webView)
+        let nextTurn = expectation(description: "Popup focus repair has run")
+        DispatchQueue.main.async { nextTurn.fulfill() }
+        await fulfillment(of: [nextTurn], timeout: 1)
+        XCTAssertTrue(popup.panel.firstResponder === popup.webView)
+
+        // The repair is one-shot, not a loop that can steal later focus.
+        popup.panel.makeFirstResponder(nil)
+        let laterTurn = expectation(description: "No second focus repair")
+        DispatchQueue.main.async { laterTurn.fulfill() }
+        await fulfillment(of: [laterTurn], timeout: 1)
+        XCTAssertFalse(popup.panel.firstResponder === popup.webView)
+    }
+
+    @MainActor
+    func testLoginPopupFocusRetryCannotReshowHiddenOrDisposedWindow() async throws {
+        _ = NSApplication.shared
+        let parent = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 480, height: 720),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        parent.isReleasedWhenClosed = false
+        defer { parent.close() }
+        for closePopup in [false, true] {
+            let configuration = WKWebViewConfiguration()
+            configuration.websiteDataStore = .nonPersistent()
+            let popup = LoginPopup(configuration: configuration, policy: try SharedFixtures.chatGPTPolicy(), initialURL: nil)
+            popup.show(relativeTo: parent)
+            if closePopup { popup.dispose() }
+            else { popup.hide() }
+            let nextTurn = expectation(description: "Hidden popup skips focus repair")
+            DispatchQueue.main.async { nextTurn.fulfill() }
+            await fulfillment(of: [nextTurn], timeout: 1)
+            XCTAssertFalse(popup.panel.isVisible)
+            if closePopup {
+                XCTAssertNil(popup.panel.contentView)
+                XCTAssertNil(popup.panel.onUserAdjustFrame)
+            } else {
+                popup.dispose()
+            }
+        }
+    }
+
+    @MainActor
+    func testLoginPanelDistinguishesUserAdjustmentFromProgrammaticFrameChanges() {
+        _ = NSApplication.shared
+        let parent = LoginPanel()
+        let popup = LoginPanel()
+        defer {
+            parent.removeChildWindow(popup)
+            popup.close()
+            parent.close()
+        }
+        var userAdjustments = 0
+        popup.onUserAdjustFrame = { userAdjustments += 1 }
+        parent.addChildWindow(popup, ordered: .above)
+        popup.orderFront(nil)
+        popup.setFrame(NSRect(x: 200, y: 200, width: 400, height: 500), display: false)
+        parent.setFrameOrigin(NSPoint(x: 300, y: 300))
+        NotificationCenter.default.post(name: NSWindow.didMoveNotification, object: popup)
+        NotificationCenter.default.post(name: NSWindow.didResizeNotification, object: popup)
+        XCTAssertEqual(userAdjustments, 0)
+        NotificationCenter.default.post(name: NSWindow.willMoveNotification, object: popup)
+        XCTAssertEqual(userAdjustments, 1)
+        NotificationCenter.default.post(name: NSWindow.willStartLiveResizeNotification, object: popup)
+        XCTAssertEqual(userAdjustments, 2)
+    }
+
+    @MainActor
     func testLoginPopupFailureUsesSharedOverlayAndOnlyOffersSafeRetry() throws {
         _ = NSApplication.shared
         let policy = try SharedFixtures.chatGPTPolicy()
