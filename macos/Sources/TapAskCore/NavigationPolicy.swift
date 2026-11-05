@@ -1,7 +1,6 @@
 import Foundation
 
 /// Top-level trust is separate from HTTPS resources and subframes (for example, CAPTCHA).
-/// Adapted from the patched Quick-Chat policy; see THIRD_PARTY_NOTICES.md.
 public struct NavigationPolicy: Sendable {
     public enum Decision: String, Equatable, Sendable { case allow, download, browser, cancel }
 

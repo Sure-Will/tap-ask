@@ -7,7 +7,7 @@
     { "id": "claude", "name": "Claude", "home": "https://claude.ai/", "hosts": ["claude.ai"] },
     { "id": "gemini", "name": "Gemini", "home": "https://gemini.google.com/app", "hosts": ["gemini.google.com"] },
     { "id": "deepseek", "name": "DeepSeek", "home": "https://chat.deepseek.com/", "hosts": ["chat.deepseek.com"] },
-    { "id": "grok", "name": "Grok", "home": "https://grok.com/", "hosts": ["grok.com", "accounts.x.ai"] },
+    { "id": "grok", "name": "Grok", "home": "https://grok.com/", "hosts": ["grok.com", "accounts.x.ai", "auth.grok.com"] },
     { "id": "doubao", "name": "豆包", "home": "https://www.doubao.com/chat/", "hosts": ["www.doubao.com"] }
   ]
 }

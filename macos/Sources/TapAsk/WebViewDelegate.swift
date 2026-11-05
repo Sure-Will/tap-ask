@@ -4,7 +4,7 @@ import WebKit
 
 @MainActor
 final class WebViewDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
-    // Safari UA from the user's patched Quick-Chat build (2026-11-04).
+    // Desktop Safari UA: providers serve their full web app and permit Google sign-in.
     private static let safariUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15"
     private let policy: NavigationPolicy
     private let isPopup: Bool

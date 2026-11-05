@@ -44,7 +44,7 @@ TapAsk 在 Mac 与 Windows 上使用各自的原生实现，两端只共享 `sha
 | 5 | Grok | `https://grok.com/` | `grok.com`、`accounts.x.ai` |
 | 6 | 豆包 | `https://www.doubao.com/chat/` | `www.doubao.com` |
 
-Claude、Gemini、Grok、豆包的实际打开与登录尚待用户在真机验收。Google 登录使用现有的 `accounts.google.com`、`accounts.youtube.com`，不扩大共享登录主机；若登录仍有缺失的主机，须依据真机日志确认后再补精确允许项。
+六家服务商的打开与登录已于 2026-11-06 由用户真机验收。Grok 另放行自家登录主机 `auth.grok.com`。Google 登录使用现有的 `accounts.google.com`、`accounts.youtube.com`，不扩大共享登录主机；若登录仍有缺失的主机，须依据真机日志确认后再补精确允许项。
 
 HTTPS 检查拒绝凭据、空主机、非 443 显式端口及其他协议。顶层外链只有在来源可信、用户点击且请求为 GET 时才交默认浏览器；脚本跳转、重定向和 POST 不外送。缺失 method 按原策略视为 GET。HTTPS 子框架和 `about:blank` / `about:srcdoc` 按独立分支检查，不扩张顶层信任范围。
 

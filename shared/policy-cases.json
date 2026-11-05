@@ -364,6 +364,20 @@
       "expected": true
     },
     {
+      "id": "grok-auth-host",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://auth.grok.com/sign-in",
+      "expected": true
+    },
+    {
+      "id": "grok-auth-host-other-provider",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "claude",
+      "url": "https://auth.grok.com/sign-in",
+      "expected": false
+    },
+    {
       "id": "grok-http-downgrade",
       "group": "testGrokNavigationAndOrigins",
       "provider": "grok",

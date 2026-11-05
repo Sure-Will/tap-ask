@@ -14,7 +14,7 @@ final class ProviderCatalogTests: XCTestCase {
         XCTAssertEqual(catalog.providers.map(\.hosts), [
             ["chatgpt.com", "chat.openai.com", "auth.openai.com", "auth0.openai.com", "setup.auth.openai.com"],
             ["claude.ai"], ["gemini.google.com"], ["chat.deepseek.com"],
-            ["grok.com", "accounts.x.ai"], ["www.doubao.com"],
+            ["grok.com", "accounts.x.ai", "auth.grok.com"], ["www.doubao.com"],
         ])
         XCTAssertEqual(catalog.identityHosts, ["accounts.google.com", "accounts.youtube.com", "appleid.apple.com",
                                               "account.apple.com", "login.microsoftonline.com", "login.microsoft.com",

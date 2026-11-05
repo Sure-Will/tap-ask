@@ -1,25 +1,67 @@
 # TapAsk
 
-按 ⌥空格呼出 AI 网页浮窗，再按一次收起，焦点由系统还给之前的 app。支持 ChatGPT、Claude、Gemini、DeepSeek、Grok、豆包，默认依次对应 ⌘1–⌘6。菜单栏图标左键单击呼出 / 收起浮窗，右键或 Control + 左键打开菜单；菜单提供服务商切换、服务商排序、显示 / 隐藏、重新加载和退出。在“服务商排序…”窗口拖动整行或按 ⌥↑ / ⌥↓ 调整顺序，快捷键立即跟随；“恢复默认”还原目录顺序。TapAsk 使用原生窗口和持久化 WebView，无 Dock 图标。网页铺满浮窗，顶部 8pt 可拖动；访问外部登录页面时，顶部中央显示不拦截点击的来源胶囊。
+按 ⌥空格，AI 聊天浮窗出现在所有窗口之上；再按一次收起，焦点回到你原来的 app。
 
-当前为 **Mac Phase 1**，要求 macOS 14+、Swift 6 / Xcode Command Line Tools，无第三方依赖。Windows 原生版在 Phase 2 实现；两端只共享 `shared/` 的两个 JSON 和 [行为约定](docs/behavior.md)，不共享代码。
+支持 ChatGPT、Claude、Gemini、DeepSeek、Grok、豆包，用 ⌘1 到 ⌘6 切换。每家服务商的页面各自常驻，切走再切回来，对话还在原处。
 
-在仓库内构建与验证（不安装、不启动）
+## 下载与安装
+
+要求 macOS 14 或更高版本，Apple 芯片和 Intel 芯片都能用。
+
+1. 从 [Releases](https://github.com/Sure-Will/tap-ask/releases) 下载 `TapAsk-<版本>-macOS.zip`，解压。
+2. 把 `TapAsk.app` 拖进“应用程序”文件夹。
+3. 双击打开。TapAsk 还没有经过 Apple 公证，第一次打开会被 macOS 拦下，提示无法验证它是否安全。被拦下之后，用下面任一方法放行：
+   - 打开 系统设置 › 隐私与安全性，在页面下方找到 TapAsk，点“仍要打开”；
+   - 或者在终端里运行：
+
+     ```bash
+     xattr -dr com.apple.quarantine /Applications/TapAsk.app
+     ```
+
+装进“应用程序”文件夹后第一次打开，TapAsk 会把自己加为登录项，开机后在后台准备好，菜单栏图标常驻，Dock 里没有图标。不想开机启动，可以在 系统设置 › 通用 › 登录项 里关掉。
+
+## 使用
+
+| 操作 | 作用 |
+|---|---|
+| ⌥空格 | 呼出或收起浮窗 |
+| ⌘1 到 ⌘6 | 切换服务商 |
+| ⌘R | 重新加载当前页面 |
+| 左键单击菜单栏图标 | 呼出或收起浮窗 |
+| 右键单击菜单栏图标 | 打开菜单：切换服务商、服务商排序、重新加载、退出 |
+
+在右键菜单的“服务商排序…”里拖动整行，或者选中一行按 ⌥↑ / ⌥↓，就能调整顺序，⌘ 编号会跟着变，“恢复默认”回到初始顺序。
+
+网页铺满整个浮窗。拖动浮窗最上沿约 8pt 的那一条可以移动窗口，拖动边缘可以调整大小，位置和大小下次打开还在。
+
+每家服务商都直接在浮窗里登录，登录状态保存在本机。跳到 Google 等外部登录页时，浮窗顶部会显示当前所在的网站。网络不通时，浮窗会显示失败原因和“重试”按钮，切回加载失败的服务商也会自动重新加载。
+
+如果按 ⌥空格 没有反应，可能是别的 app 也占用了这个组合键，在那个 app 里改掉即可。
+
+TapAsk 本身不收集、不上传任何数据，写进本机系统日志的只有主机名，不含完整网址。浮窗里只会打开当前服务商和常见登录页的网站，你点击的其他链接会用系统默认浏览器打开。
+
+## 从源码构建
+
+需要 Xcode Command Line Tools（Swift 6），没有第三方依赖。
 
 ```bash
 cd macos
-swift build --disable-sandbox
 swift test --disable-sandbox
 scripts/build-app.sh
-codesign --verify --strict --verbose=2 build/TapAsk.app
-plutil -lint build/TapAsk.app/Contents/Info.plist
-/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' build/TapAsk.app/Contents/Info.plist
-test -f build/TapAsk.app/Contents/Resources/providers.json
-test -f build/TapAsk.app/Contents/Resources/AppIcon.icns
 ```
 
-产物为 `macos/build/TapAsk.app`，使用临时签名，bundle id 为 `io.github.sure-will.tap-ask`。打包脚本把 `shared/providers.json` 和已生成的 `macos/Resources/AppIcon.icns` 复制为 app 资源；裸跑 SwiftPM 可执行文件不具备服务商资源。菜单栏与 app 图标共用 `TapAskCore/BrandMark.swift` 的几何定义；修改后在 `macos/` 下运行 `scripts/make-icons.sh`（或 `swift run --disable-sandbox make-icons`），生成 `build/AppIcon.iconset` 与 `Resources/AppIcon.icns`，再重新打包，平时打包不重新生成图标。缓存目录不可写时，可将 `CLANG_MODULE_CACHE_PATH` 和 `SWIFTPM_MODULECACHE_OVERRIDE` 设为 `$PWD/.build/ModuleCache`，并给 Swift 命令加 `--cache-path "$PWD/.build/cache"`。
+产物是 `macos/build/TapAsk.app`，同时包含 arm64 和 x86_64，使用临时签名。服务商列表在 `shared/providers.json`，导航规则的测试用例在 `shared/policy-cases.json`，行为约定和手工验收清单见 [docs/behavior.md](docs/behavior.md)。
 
-使用时请先把 `TapAsk.app` 拷进 `/Applications` 再第一次打开，也支持安装到 `~/Applications`。仅在这两个安装目录下且尚未尝试注册时，app 才会尝试注册登录项并记录已尝试；从构建目录打开只记日志，不注册、不写标记，装好后仍可注册。之后尊重系统设置中的关闭操作；登录启动只后台预热，菜单栏图标常驻。启动只预热上次使用的服务商，其他服务商首次切换时创建 WebView 并加载首页，切回来保留页面状态；不等待联网完成才显示窗口。自定义顺序保存在 UserDefaults 的 `ProviderOrder` 中，未出现在保存顺序中的新服务商自动追加到末尾；没有有效的上次服务商时使用排序后的第一项。Claude、Gemini、Grok、豆包的实际打开与登录仍待用户真机验收。下载、语音、公证和 Windows 实现在本阶段范围外。
+菜单栏图标和 App 图标的图形都定义在 `macos/Sources/TapAskCore/BrandMark.swift`，改动后运行 `scripts/make-icons.sh` 重新生成 App 图标。
 
-自动化测试包含共享导航用例、窗口切换、品牌几何、服务商排序、菜单结构、顶部点击命中和实际 WebKit 委托回调；`ProviderOrderWindowTests` 需要 WindowServer，`ChatPanelTests` 与 `NavigationDelegateTests` 还需要能启动 WebKit 子进程的 macOS 会话。沙盒中可先用 `swift test --disable-sandbox --skip 'NavigationDelegateTests|ChatPanelTests|ProviderOrderWindowTests'` 执行其余测试，真实窗口和导航回调测试在沙盒外运行。输入法、登录、焦点及全屏体验按 [手动验收清单](docs/behavior.md) 检查。移植代码的许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+`ChatPanelTests`、`NavigationDelegateTests`、`ProviderOrderWindowTests` 需要能打开窗口、启动 WebKit 的正常 macOS 会话，在沙盒里可以先跳过：
+
+```bash
+swift test --disable-sandbox --skip 'NavigationDelegateTests|ChatPanelTests|ProviderOrderWindowTests'
+```
+
+Windows 版还在计划中。
+
+## 许可证
+
+[GPL-3.0](LICENSE)

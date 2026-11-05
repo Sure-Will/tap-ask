@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Assemble the SwiftPM release executable as an ad-hoc signed app. Never launches it.
+# Assemble a universal (arm64 + x86_64) ad-hoc signed app from the SwiftPM release build. Never launches it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -7,8 +7,8 @@ export CLANG_MODULE_CACHE_PATH="$PWD/.build/ModuleCache"
 export SWIFTPM_MODULECACHE_OVERRIDE="$PWD/.build/ModuleCache"
 mkdir -p "$CLANG_MODULE_CACHE_PATH" "$PWD/.build/cache"
 
-swift build --disable-sandbox --cache-path "$PWD/.build/cache" -c release
-BIN_DIR="$(swift build --disable-sandbox --cache-path "$PWD/.build/cache" -c release --show-bin-path)"
+swift build --disable-sandbox --cache-path "$PWD/.build/cache" -c release --arch arm64 --arch x86_64
+BIN_DIR="$(swift build --disable-sandbox --cache-path "$PWD/.build/cache" -c release --arch arm64 --arch x86_64 --show-bin-path)"
 APP="build/TapAsk.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
