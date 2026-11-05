@@ -22,17 +22,24 @@ final class PageReloadTests: XCTestCase {
         for host in ["accounts.google.com", "appleid.apple.com", "login.microsoftonline.com", "chatgpt.com"] {
             let initialURL = try XCTUnwrap(URL(string: "https://\(host)/authorize?state=fixture&client_id=test"))
             XCTAssertEqual(loginPopupRetryURL(initialURL: initialURL, policy: policy), initialURL)
+            let request = try XCTUnwrap(loginPopupRetryRequest(initialURL: initialURL, policy: policy))
+            XCTAssertEqual(request.url, initialURL)
+            XCTAssertEqual(request.httpMethod, "GET")
+            XCTAssertNil(request.httpBody)
+            XCTAssertNil(request.httpBodyStream)
         }
     }
 
     func testPopupRetryHasNoFallbackForMissingOrUntrustedInitialURL() throws {
         let policy = try SharedFixtures.chatGPTPolicy()
         XCTAssertNil(loginPopupRetryURL(initialURL: nil, policy: policy))
+        XCTAssertNil(loginPopupRetryRequest(initialURL: nil, policy: policy))
         for address in ["about:blank", "http://accounts.google.com/login", "https://example.invalid/login",
                         "https://accounts.google.com.example.invalid/login", "https://claude.ai/login",
                         "https://user:password@accounts.google.com/login", "https://accounts.google.com:8443/login"] {
             let initialURL = try XCTUnwrap(URL(string: address))
             XCTAssertNil(loginPopupRetryURL(initialURL: initialURL, policy: policy), address)
+            XCTAssertNil(loginPopupRetryRequest(initialURL: initialURL, policy: policy), address)
         }
     }
 
@@ -42,5 +49,6 @@ final class PageReloadTests: XCTestCase {
         XCTAssertEqual(loginPopupRetryURL(initialURL: initialURL, policy: policy), initialURL)
         let restrictedPolicy = NavigationPolicy(provider: policy.provider, identityHosts: [])
         XCTAssertNil(loginPopupRetryURL(initialURL: initialURL, policy: restrictedPolicy))
+        XCTAssertNil(loginPopupRetryRequest(initialURL: initialURL, policy: restrictedPolicy))
     }
 }

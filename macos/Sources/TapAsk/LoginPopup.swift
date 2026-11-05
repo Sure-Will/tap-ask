@@ -42,6 +42,7 @@ final class LoginPopup: NSObject {
         ])
         pageLoadOverlay.onRetry = { [weak self] in self?.reload() }
         webDelegate.onLoadStateChange = { [weak self] state in self?.updateLoadState(state) }
+        webDelegate.onPopupProcessTermination = { [weak self] in self?.reload() }
         webDelegate.onNavigationNotice = { [weak self] notice in self?.navigationNotice.show(notice) }
         panel.onCancel = { [weak self] in self?.onClose?() }
         panel.onUserAdjustFrame = { [weak self] in self?.placement.userDidAdjustFrame() }
@@ -136,9 +137,10 @@ final class LoginPopup: NSObject {
 
     /// Never reload the last request: it may be a POST or a one-time OAuth callback.
     func reload() {
-        guard let url = loginPopupRetryURL(initialURL: initialURL, policy: policy) else { return }
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
+        guard let request = loginPopupRetryRequest(initialURL: initialURL, policy: policy) else {
+            updateLoadState(.failed(PageLoadFailure(domain: NSURLErrorDomain, code: NSURLErrorBadURL)))
+            return
+        }
         webView.load(request)
     }
 
@@ -155,6 +157,7 @@ final class LoginPopup: NSObject {
         webDelegate.onClose = nil
         webDelegate.onCommit = nil
         webDelegate.onLoadStateChange = nil
+        webDelegate.onPopupProcessTermination = nil
         webDelegate.onNavigationNotice = nil
         pageLoadOverlay.onRetry = nil
         updateLoadState(.idle)

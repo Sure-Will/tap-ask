@@ -36,26 +36,42 @@ start_time="$(date -j -f '%a %b %e %T %Y' "$app_start" '+%Y-%m-%d %H:%M:%S')"
 # since this launch establish ownership; never sweep all system WebKit processes.
 connections="$(log show --start "$start_time" --style compact --info --debug \
     --predicate "processID == $app_pid AND eventMessage CONTAINS \"didConnectToProcess\"")"
-candidate_pids="$(printf '%s\n' "$connections" | awk '
-    { while (match($0, /\[PID=[0-9]+\]/)) {
-        print substr($0, RSTART + 5, RLENGTH - 6)
-        $0 = substr($0, RSTART + RLENGTH)
-    } }
-' | sort -nu)"
+candidate_connections="$(printf '%s\n' "$connections" | awk '
+    {
+        connected_at = $1 " " substr($2, 1, 8)
+        while (match($0, /\[PID=[0-9]+\]/)) {
+            pid = substr($0, RSTART + 5, RLENGTH - 6)
+            last_connected[pid] = connected_at
+            $0 = substr($0, RSTART + RLENGTH)
+        }
+    }
+    END { for (pid in last_connected) print pid, last_connected[pid] }
+' | sort -n)"
 pids=("$app_pid")
 names=("$process_name")
-while IFS= read -r pid; do
+while read -r pid connected_at; do
     [[ -n "$pid" && "$pid" != "$app_pid" ]] || continue
     if ! command_name="$(ps -p "$pid" -o comm=)" || [[ -z "$command_name" ]]; then
         continue # Exited since its connection was logged.
     fi
     case "${command_name##*/}" in
         com.apple.WebKit.WebContent*|com.apple.WebKit.Networking*|com.apple.WebKit.GPU*)
+            if ! process_start="$(ps -p "$pid" -o lstart=)" || [[ -z "$process_start" ]]; then
+                continue # Exited while checking ownership.
+            fi
+            process_start="${process_start#"${process_start%%[![:space:]]*}"}"
+            process_start_epoch="$(date -j -f '%a %b %e %T %Y' "$process_start" '+%s')"
+            connection_epoch="$(date -j -f '%Y-%m-%d %H:%M:%S' "$connected_at" '+%s')"
+            # Allow two seconds for timestamp precision; a later start means PID reuse.
+            if (( process_start_epoch > connection_epoch + 2 )); then
+                echo "Skipping PID $pid: process started after this app's last connection (PID reused)." >&2
+                continue
+            fi
             pids+=("$pid")
             names+=("${command_name##*/}")
             ;;
     esac
-done <<< "$candidate_pids"
+done <<< "$candidate_connections"
 if [[ ${#pids[@]} -eq 1 ]]; then
     echo "No live WebKit processes found in this app's connection log; this sample covers the app only." >&2
 fi

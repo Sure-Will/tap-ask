@@ -14,3 +14,11 @@ public func pageReloadTarget(isAppActive: Bool, isLoginPopupKeyWindow: Bool) -> 
 public func loginPopupRetryURL(initialURL: URL?, policy: NavigationPolicy) -> URL? {
     policy.isPanelURL(initialURL) ? initialURL : nil
 }
+
+/// Retry and process recovery must not reuse the current URL, request method or body.
+public func loginPopupRetryRequest(initialURL: URL?, policy: NavigationPolicy) -> URLRequest? {
+    guard let url = loginPopupRetryURL(initialURL: initialURL, policy: policy) else { return nil }
+    var request = URLRequest(url: url)
+    request.httpMethod = "GET"
+    return request
+}

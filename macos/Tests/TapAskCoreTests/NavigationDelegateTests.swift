@@ -167,6 +167,16 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
 
     @MainActor
     func testPopupRetryUsesInitialGETInsteadOfTheLastPOST() async throws {
+        try await assertPopupRestartsWithInitialGET(processTerminated: false)
+    }
+
+    @MainActor
+    func testPopupProcessTerminationUsesInitialGETInsteadOfTheLastPOST() async throws {
+        try await assertPopupRestartsWithInitialGET(processTerminated: true)
+    }
+
+    @MainActor
+    private func assertPopupRestartsWithInitialGET(processTerminated: Bool) async throws {
         _ = NSApplication.shared
         let initialURL = try XCTUnwrap(URL(string: "https://accounts.google.com/authorize?state=fixture"))
         let callbackURL = try XCTUnwrap(URL(string: "https://chatgpt.com/callback?code=one-time-fixture"))
@@ -193,14 +203,18 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
         popup.webView.load(post)
         await fulfillment(of: [postObserved], timeout: 3)
 
-        delegate.webView(popup.webView, didStartProvisionalNavigation: nil)
-        delegate.webView(popup.webView, didFailProvisionalNavigation: nil,
-                         withError: NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut))
-        let overlay = try XCTUnwrap(popup.webView.subviews.first { $0 is PageLoadOverlayView })
-        let stack = try XCTUnwrap(overlay.subviews.first as? NSStackView)
-        let retry = try XCTUnwrap(stack.views.compactMap { $0 as? NSButton }.first)
-        XCTAssertFalse(retry.isHidden)
-        retry.performClick(nil) // Exercise the real button's weak callback to LoginPopup.reload().
+        if processTerminated {
+            delegate.webViewWebContentProcessDidTerminate(popup.webView)
+        } else {
+            delegate.webView(popup.webView, didStartProvisionalNavigation: nil)
+            delegate.webView(popup.webView, didFailProvisionalNavigation: nil,
+                             withError: NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut))
+            let overlay = try XCTUnwrap(popup.webView.subviews.first { $0 is PageLoadOverlayView })
+            let stack = try XCTUnwrap(overlay.subviews.first as? NSStackView)
+            let retry = try XCTUnwrap(stack.views.compactMap { $0 as? NSButton }.first)
+            XCTAssertFalse(retry.isHidden)
+            retry.performClick(nil) // Exercise the real button's weak callback to LoginPopup.reload().
+        }
         await fulfillment(of: [retryObserved], timeout: 3)
         XCTAssertEqual(requests.compactMap(\.url), [callbackURL, initialURL])
         XCTAssertEqual(requests.map(\.httpMethod), ["POST", "GET"])
@@ -210,7 +224,7 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
     }
 
     @MainActor
-    func testPopupReloadDoesNothingWithoutAnAllowedInitialURL() async throws {
+    func testPopupReloadAndProcessTerminationRequireAllowedInitialURL() async throws {
         _ = NSApplication.shared
         for initialURL in [nil, URL(string: "https://example.invalid/login")] {
             let configuration = WKWebViewConfiguration()
@@ -218,6 +232,7 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
             let popup = LoginPopup(configuration: configuration, policy: try SharedFixtures.chatGPTPolicy(),
                                    initialURL: initialURL)
             defer { popup.dispose() }
+            let delegate = try XCTUnwrap(popup.webView.navigationDelegate as? WebViewDelegate)
             let harness = NavigationHarness()
             let unexpectedLoad = expectation(description: "No fallback or reload without an allowed initial URL")
             unexpectedLoad.isInverted = true
@@ -227,7 +242,15 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
             }
             popup.webView.navigationDelegate = harness
             popup.reload()
+            delegate.webViewWebContentProcessDidTerminate(popup.webView)
             await fulfillment(of: [unexpectedLoad], timeout: 0.5)
+            let overlay = try XCTUnwrap(popup.webView.subviews.first { $0 is PageLoadOverlayView })
+            let stack = try XCTUnwrap(overlay.subviews.first as? NSStackView)
+            let retry = try XCTUnwrap(stack.views.compactMap { $0 as? NSButton }.first)
+            XCTAssertFalse(overlay.isHidden)
+            XCTAssertTrue(retry.isHidden)
+            XCTAssertTrue(stack.views.compactMap { $0 as? NSTextField }
+                .contains { !$0.isHidden && $0.stringValue.contains("请关闭后重新登录") })
             withExtendedLifetime(harness) {}
         }
     }

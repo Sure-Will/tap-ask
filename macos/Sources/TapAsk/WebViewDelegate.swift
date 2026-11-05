@@ -13,6 +13,7 @@ final class WebViewDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
     var onNavigationNotice: ((NavigationNotice) -> Void)?
     var onCommit: ((URL?) -> Void)?
     var onProcessTermination: ((WebContentTerminationAction) -> Void)?
+    var onPopupProcessTermination: (() -> Void)?
     var onCreatePopup: ((WKWebViewConfiguration, URL?) -> WKWebView?)?
     var onClose: (() -> Void)?
 
@@ -195,8 +196,7 @@ final class WebViewDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
         log(webView.url, phase: action == .reloadNow ? "process-terminated-reload" : "process-terminated-deferred",
             result: .allow)
         if isPopup {
-            if webView.url != nil { webView.reload() }
-            else { webView.load(URLRequest(url: policy.provider.home)) }
+            onPopupProcessTermination?()
         } else {
             onProcessTermination?(action)
         }

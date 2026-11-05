@@ -28,6 +28,21 @@ if [[ "$2" == 100 ]]; then
     fi
     exit 0
 fi
+if [[ "$4" == lstart= ]]; then
+    case "$2" in
+        200)
+            case "$MEMORY_FIXTURE_MODE" in
+                reused-pid) echo 'Fri Nov  6 01:00:08 2026' ;;
+                connection-grace) echo 'Fri Nov  6 01:00:07 2026' ;;
+                *) echo 'Fri Nov  6 01:00:04 2026' ;;
+            esac
+            ;;
+        201) echo 'Fri Nov  6 01:00:02 2026' ;;
+        202) echo 'Fri Nov  6 00:59:59 2026' ;;
+        *) echo "Unexpected process start lookup: $*" >&2; exit 2 ;;
+    esac
+    exit 0
+fi
 case "$2" in
     200) echo '/System/Library/Frameworks/WebKit.framework/com.apple.WebKit.WebContent' ;;
     201) echo '/System/Library/Frameworks/WebKit.framework/com.apple.WebKit.Networking' ;;
@@ -47,12 +62,12 @@ cat > "$fixture/bin/log" <<'SH'
 [[ "$*" == *'--start 2026-11-06 01:00:00'* ]] || exit 2
 [[ "$MEMORY_FIXTURE_MODE" == no-webkit ]] && exit 0
 printf '%s\n' \
-    'WebProcessProxy::didConnectToProcess [PID=200]' \
-    'NetworkProcessProxy::didConnectToProcess [PID=201]' \
-    'GPUProcessProxy::didConnectToProcess [PID=202]' \
-    'WebProcessProxy::didConnectToProcess [PID=200]' \
-    'WebProcessProxy::didConnectToProcess [PID=203]' \
-    'WebProcessProxy::didConnectToProcess [PID=204]'
+    '2026-11-06 01:00:01.000 Df TapAsk-Debug[100] WebProcessProxy::didConnectToProcess [PID=200]' \
+    '2026-11-06 01:00:02.000 Df TapAsk-Debug[100] NetworkProcessProxy::didConnectToProcess [PID=201]' \
+    '2026-11-06 01:00:03.000 Df TapAsk-Debug[100] GPUProcessProxy::didConnectToProcess [PID=202]' \
+    '2026-11-06 01:00:05.500 Df TapAsk-Debug[100] WebProcessProxy::didConnectToProcess [PID=200]' \
+    '2026-11-06 01:00:06.000 Df TapAsk-Debug[100] WebProcessProxy::didConnectToProcess [PID=203]' \
+    '2026-11-06 01:00:07.000 Df TapAsk-Debug[100] WebProcessProxy::didConnectToProcess [PID=204]'
 SH
 cat > "$fixture/bin/footprint" <<'SH'
 #!/usr/bin/env bash
@@ -88,6 +103,24 @@ csv="$fixture/app/build/memory.csv"
 [[ "$(head -n 1 "$csv")" == 'timestamp,label,total_mib,process_count' ]]
 [[ "$(tail -n 1 "$csv")" == *',"round,""1""",10.000,4' ]]
 
+# The latest connection, not the first one, establishes the current PID's ownership.
+# A process starting exactly two seconds after that connection is still accepted.
+export MEMORY_FIXTURE_MODE=connection-grace
+rm -f "$fixture/sampled"
+"$measurement" TapAsk-Debug > "$fixture/output"
+[[ "$(cat "$fixture/sampled")" == $'100\n200\n201\n202' ]]
+[[ "$(tail -n 1 "$csv")" == *',"TapAsk-Debug",10.000,4' ]]
+
+export MEMORY_FIXTURE_MODE=reused-pid
+rm -f "$fixture/sampled"
+"$measurement" TapAsk-Debug > "$fixture/output" 2> "$fixture/stderr"
+if [[ "$(cat "$fixture/sampled")" != $'100\n201\n202' ]]; then
+    echo 'FAIL: reused WebKit PID 200 was measured' >&2
+    exit 1
+fi
+[[ "$(tail -n 1 "$csv")" == *',"TapAsk-Debug",8.000,3' ]]
+[[ "$(cat "$fixture/stderr")" == *'Skipping PID 200:'*'PID reused'* ]]
+
 for mode in missing multiple log-failed footprint-failed malformed restarted; do
     export MEMORY_FIXTURE_MODE="$mode"
     cp "$csv" "$fixture/before.csv"
@@ -105,5 +138,5 @@ export MEMORY_FIXTURE_MODE=gpu-exits
 export MEMORY_FIXTURE_MODE=no-webkit
 "$measurement" TapAsk-Debug > "$fixture/output" 2>&1
 [[ "$(tail -n 1 "$csv")" == *',"TapAsk-Debug",1.000,1' ]]
-[[ "$(wc -l < "$csv" | tr -d ' ')" == 4 ]]
-echo 'Memory script fixtures passed (ownership, deduplication, byte totals, CSV, exits and error paths).'
+[[ "$(wc -l < "$csv" | tr -d ' ')" == 6 ]]
+echo 'Memory script fixtures passed (ownership, PID reuse, connection grace, deduplication, byte totals, CSV, exits and error paths).'
