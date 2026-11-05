@@ -8,6 +8,9 @@ final class ChatPanel: NSPanel, NSWindowDelegate {
     private var savedFrame: NSRect?
     private let dragStrip = PanelDragView()
     private let originBadge = OriginBadgeView()
+    private let navigationNotice = NavigationNoticeView()
+    private var noticeBelowOrigin: NSLayoutConstraint?
+    private var noticeAtTop: NSLayoutConstraint?
     private let pageLoadOverlay = PageLoadOverlayView()
     var onCancel: (() -> Void)?
     var onBecomeKey: (() -> Void)?
@@ -15,7 +18,10 @@ final class ChatPanel: NSPanel, NSWindowDelegate {
         didSet { pageLoadOverlay.onRetry = onRetry }
     }
     var origin = "" {
-        didSet { originBadge.origin = origin }
+        didSet {
+            originBadge.origin = origin
+            updateNoticePosition()
+        }
     }
 
     override var contentView: NSView? {
@@ -61,12 +67,28 @@ final class ChatPanel: NSPanel, NSWindowDelegate {
         pageLoadOverlay.update(state, providerName: providerName)
     }
 
+    func showNavigationNotice(_ notice: NavigationNotice) {
+        navigationNotice.show(notice)
+    }
+
+    private func updateNoticePosition() {
+        noticeBelowOrigin?.isActive = false
+        noticeAtTop?.isActive = false
+        (origin.isEmpty ? noticeAtTop : noticeBelowOrigin)?.isActive = true
+    }
+
     private func installOverlays() {
+        navigationNotice.dismiss()
+        noticeBelowOrigin?.isActive = false
+        noticeAtTop?.isActive = false
+        noticeBelowOrigin = nil
+        noticeAtTop = nil
         dragStrip.removeFromSuperview()
         originBadge.removeFromSuperview()
         pageLoadOverlay.removeFromSuperview()
+        navigationNotice.removeFromSuperview()
         guard let contentView else { return }
-        for overlay in [dragStrip, originBadge, pageLoadOverlay] {
+        for overlay in [dragStrip, originBadge, pageLoadOverlay, navigationNotice] {
             overlay.translatesAutoresizingMaskIntoConstraints = false
             contentView.addSubview(overlay, positioned: .above, relativeTo: nil)
         }
@@ -78,10 +100,15 @@ final class ChatPanel: NSPanel, NSWindowDelegate {
             originBadge.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
             originBadge.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             originBadge.widthAnchor.constraint(lessThanOrEqualTo: contentView.widthAnchor, constant: -24),
+            navigationNotice.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            navigationNotice.widthAnchor.constraint(lessThanOrEqualTo: contentView.widthAnchor, constant: -24),
             pageLoadOverlay.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             pageLoadOverlay.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             pageLoadOverlay.widthAnchor.constraint(lessThanOrEqualTo: contentView.widthAnchor, constant: -32),
         ])
+        noticeBelowOrigin = navigationNotice.topAnchor.constraint(equalTo: originBadge.bottomAnchor, constant: 6)
+        noticeAtTop = navigationNotice.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10)
+        updateNoticePosition()
     }
 
     func prepareForPresentation() {

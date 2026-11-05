@@ -131,22 +131,31 @@ final class LifecycleTests: XCTestCase {
         defer { owner.panel.orderOut(nil) }
         weak var popup: LoginPopup?
         weak var overlay: PageLoadOverlayView?
+        weak var notice: NavigationNoticeView?
+        weak var window: LoginPanel?
         try autoreleasepool {
             let configuration = WKWebViewConfiguration()
             configuration.websiteDataStore = .nonPersistent()
             let page = owner.openLoginPopup(configuration: configuration, policy: policy, initialURL: nil)
             popup = try XCTUnwrap(owner.loginPopup)
+            window = popup?.panel
             overlay = try XCTUnwrap(page.subviews.compactMap { $0 as? PageLoadOverlayView }.first)
+            notice = try XCTUnwrap(page.subviews.compactMap { $0 as? NavigationNoticeView }.first)
             let delegate = try XCTUnwrap(page.navigationDelegate as? WebViewDelegate)
             delegate.webView(page, didStartProvisionalNavigation: nil)
+            delegate.onNavigationNotice?(try XCTUnwrap(navigationNotice(for: .action, mainFrame: true,
+                decision: .cancel, host: "example.invalid", providerName: policy.provider.name)))
         }
         let taskStarted = expectation(description: "Popup loading task entered its delay")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { taskStarted.fulfill() }
         await fulfillment(of: [taskStarted], timeout: 0.3)
         XCTAssertEqual(overlay?.isHidden, true)
+        XCTAssertEqual(notice?.isHidden, false)
         autoreleasepool { owner.closeLoginPopup(restoreFocus: false) }
         XCTAssertNil(popup, "Overlay callbacks must not retain the popup")
         XCTAssertNil(overlay, "The loading task must not retain the popup overlay during its delay")
+        XCTAssertNil(notice, "The six-second dismissal must not retain the popup notice")
+        XCTAssertNil(window, "Notice callbacks must not retain the login window")
         let delayExpired = expectation(description: "Popup loading delay expired")
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { delayExpired.fulfill() }
         await fulfillment(of: [delayExpired], timeout: 1)
@@ -154,6 +163,38 @@ final class LifecycleTests: XCTestCase {
         XCTAssertNil(overlay)
         XCTAssertNil(owner.loginPopup)
         withExtendedLifetime(owner) {}
+    }
+
+    @MainActor
+    func testNavigationNoticeReleasesWithMainWindowDuringDismissalDelay() async throws {
+        _ = NSApplication.shared
+        let suite = "TapAsk.LifecycleTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let content = NSView()
+        var panel: ChatPanel?
+        weak var window: ChatPanel?
+        weak var notice: NavigationNoticeView?
+        try autoreleasepool {
+            let created = ChatPanel(defaults: defaults)
+            panel = created
+            window = created
+            created.contentView = content
+            notice = try XCTUnwrap(content.subviews.compactMap { $0 as? NavigationNoticeView }.first)
+            created.showNavigationNotice(try XCTUnwrap(navigationNotice(for: .action, mainFrame: true,
+                decision: .browser, host: "example.invalid", providerName: "ChatGPT")))
+        }
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(notice?.isHidden, false)
+        autoreleasepool {
+            panel?.contentView = nil
+            panel = nil
+        }
+        advanceMainRunLoop(until: { window == nil && notice == nil })
+        XCTAssertNil(window)
+        XCTAssertNil(notice, "The dismissal task must hold the view weakly across the six-second wait")
+        XCTAssertTrue(content.subviews.isEmpty)
+        withExtendedLifetime(content) {}
     }
 
     @MainActor

@@ -192,6 +192,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             guard let self, self.currentSession?.policy.provider.id == provider.id else { return }
             self.panel.origin = self.currentSession.title
         }
+        session.webDelegate.onNavigationNotice = { [weak self] notice in
+            guard let self, self.currentSession?.policy.provider.id == provider.id else { return }
+            self.panel.showNavigationNotice(notice)
+        }
         session.webDelegate.onCreatePopup = { [weak self] configuration, url in
             // A retained background page must not open a login window for the visible provider.
             guard let self, self.currentSession?.policy.provider.id == provider.id else { return nil }

@@ -10,6 +10,7 @@ final class WebViewDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
     private let isPopup: Bool
     private var loadState: PageLoadState = .idle
     var onLoadStateChange: ((PageLoadState) -> Void)?
+    var onNavigationNotice: ((NavigationNotice) -> Void)?
     var onCommit: ((URL?) -> Void)?
     var onCreatePopup: ((WKWebViewConfiguration, URL?) -> WKWebView?)?
     var onClose: (() -> Void)?
@@ -42,6 +43,9 @@ final class WebViewDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
                  decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void) {
         let result = decision(for: navigationAction)
         let newWindow = navigationAction.targetFrame == nil
+        let noticeEvent: NavigationNoticeEvent = navigationAction.shouldPerformDownload
+            || NavigationPolicy.isGeneratedFile(navigationAction.request.url) ? .download : .action
+        let noticeMainFrame = navigationAction.targetFrame?.isMainFrame ?? navigationAction.sourceFrame.isMainFrame
         if newWindow || navigationAction.targetFrame?.isMainFrame == true {
             log(navigationAction.request.url, phase: "action", result: result)
         }
@@ -56,12 +60,15 @@ final class WebViewDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
             }
         case .browser:
             decisionHandler(.cancel)
-            if let url = navigationAction.request.url { NSWorkspace.shared.open(url) }
+            if let url = navigationAction.request.url, NSWorkspace.shared.open(url) {
+                reportNotice(noticeEvent, mainFrame: noticeMainFrame, result: result, url: url)
+            }
         case .download:
             decisionHandler(.cancel)
             log(navigationAction.request.url, phase: "download-cancelled", result: result)
         case .cancel:
             decisionHandler(.cancel)
+            reportNotice(noticeEvent, mainFrame: noticeMainFrame, result: result, url: navigationAction.request.url)
         }
     }
 
@@ -78,11 +85,17 @@ final class WebViewDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
         }
         if result == .download { log(navigationResponse.response.url, phase: "download-cancelled", result: result) }
         decisionHandler(result == .allow ? .allow : .cancel)
+        let noticeEvent: NavigationNoticeEvent = !navigationResponse.canShowMIMEType
+            || disposition?.hasPrefix("attachment") == true ? .download : .response
+        reportNotice(noticeEvent, mainFrame: navigationResponse.isForMainFrame,
+                     result: result, url: navigationResponse.response.url)
     }
 
     func webView(_ webView: WKWebView, didReceiveServerRedirectForProvisionalNavigation navigation: WKNavigation!) {
         let allowed = policy.isPanelURL(webView.url)
         log(webView.url, phase: "redirect", result: allowed ? .allow : .cancel)
+        // This WKNavigationDelegate callback describes the main-frame provisional navigation.
+        reportNotice(.redirect, mainFrame: true, result: allowed ? .allow : .cancel, url: webView.url)
         if !allowed { webView.stopLoading() }
     }
 
@@ -141,8 +154,12 @@ final class WebViewDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
                 return onCreatePopup?(configuration, navigationAction.request.url)
             }
         case .browser:
-            if let url = navigationAction.request.url { NSWorkspace.shared.open(url) }
-        case .download, .cancel: break
+            if let url = navigationAction.request.url, NSWorkspace.shared.open(url) {
+                reportNewWindowNotice(navigationAction, result: result)
+            }
+        case .cancel:
+            reportNewWindowNotice(navigationAction, result: result)
+        case .download: break
         }
         return nil
     }
@@ -185,5 +202,18 @@ final class WebViewDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
         let host = url?.host?.lowercased() ?? "<none>"
         let scope = isPopup ? "popup" : "main"
         AppLog.navigation.info("provider=\(self.policy.provider.id, privacy: .public) phase=\(scope, privacy: .public)-\(phase, privacy: .public) host=\(host, privacy: .public) policy=\(result.rawValue, privacy: .public)")
+    }
+
+    private func reportNewWindowNotice(_ action: WKNavigationAction, result: NavigationPolicy.Decision) {
+        let event: NavigationNoticeEvent = action.shouldPerformDownload
+            || NavigationPolicy.isGeneratedFile(action.request.url) ? .download : .newWindow
+        reportNotice(event, mainFrame: action.sourceFrame.isMainFrame, result: result, url: action.request.url)
+    }
+
+    private func reportNotice(_ event: NavigationNoticeEvent, mainFrame: Bool,
+                              result: NavigationPolicy.Decision, url: URL?) {
+        guard let notice = navigationNotice(for: event, mainFrame: mainFrame, decision: result,
+                                            host: url?.host, providerName: policy.provider.name) else { return }
+        onNavigationNotice?(notice)
     }
 }

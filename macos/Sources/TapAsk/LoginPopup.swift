@@ -11,6 +11,7 @@ final class LoginPopup {
     private let policy: NavigationPolicy
     private let initialURL: URL?
     private let pageLoadOverlay = PageLoadOverlayView()
+    private let navigationNotice = NavigationNoticeView()
     var onClose: (() -> Void)?
 
     init(configuration: WKWebViewConfiguration, policy: NavigationPolicy, initialURL: URL?) {
@@ -23,13 +24,19 @@ final class LoginPopup {
         panel.contentView = webView
         pageLoadOverlay.translatesAutoresizingMaskIntoConstraints = false
         webView.addSubview(pageLoadOverlay, positioned: .above, relativeTo: nil)
+        navigationNotice.translatesAutoresizingMaskIntoConstraints = false
+        webView.addSubview(navigationNotice, positioned: .above, relativeTo: nil)
         NSLayoutConstraint.activate([
             pageLoadOverlay.centerXAnchor.constraint(equalTo: webView.centerXAnchor),
             pageLoadOverlay.centerYAnchor.constraint(equalTo: webView.centerYAnchor),
             pageLoadOverlay.widthAnchor.constraint(lessThanOrEqualTo: webView.widthAnchor, constant: -32),
+            navigationNotice.topAnchor.constraint(equalTo: webView.topAnchor, constant: 10),
+            navigationNotice.centerXAnchor.constraint(equalTo: webView.centerXAnchor),
+            navigationNotice.widthAnchor.constraint(lessThanOrEqualTo: webView.widthAnchor, constant: -24),
         ])
         pageLoadOverlay.onRetry = { [weak self] in self?.reload() }
         webDelegate.onLoadStateChange = { [weak self] state in self?.updateLoadState(state) }
+        webDelegate.onNavigationNotice = { [weak self] notice in self?.navigationNotice.show(notice) }
         panel.onCancel = { [weak self] in self?.onClose?() }
         webDelegate.onClose = { [weak self] in self?.onClose?() }
         webDelegate.onCommit = { [weak self] url in
@@ -68,9 +75,12 @@ final class LoginPopup {
         webDelegate.onClose = nil
         webDelegate.onCommit = nil
         webDelegate.onLoadStateChange = nil
+        webDelegate.onNavigationNotice = nil
         pageLoadOverlay.onRetry = nil
         updateLoadState(.idle)
         pageLoadOverlay.removeFromSuperview()
+        navigationNotice.dismiss()
+        navigationNotice.removeFromSuperview()
         webView.stopLoading()
         webView.navigationDelegate = nil
         webView.uiDelegate = nil

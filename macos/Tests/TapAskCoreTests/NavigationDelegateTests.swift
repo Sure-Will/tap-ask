@@ -16,7 +16,9 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
             let webView = delegate.makeWebView(configuration: configuration)
             defer { stop(webView) }
             var changes: [PageLoadState] = []
+            var notices: [NavigationNotice] = []
             delegate.onLoadStateChange = { changes.append($0) }
+            delegate.onNavigationNotice = { notices.append($0) }
             let ignored = [NSError(domain: NSURLErrorDomain, code: NSURLErrorCancelled),
                            NSError(domain: "WebKitErrorDomain", code: 102),
                            NSError(domain: "WebKitErrorDomain", code: 204)]
@@ -40,6 +42,8 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
             delegate.webView(webView, didFail: nil, withError: error)
             XCTAssertEqual(changes.count, 8)
             XCTAssertEqual(changes.last, .loaded, "Later failures must preserve the committed page")
+            delegate.webViewDidClose(webView)
+            XCTAssertTrue(notices.isEmpty, "Load failures and normal popup closure must not report navigation notices")
         }
     }
 
@@ -116,6 +120,8 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
         let harness = NavigationHarness()
         let finished = expectation(description: "WebKit action cancelled")
         let webView = makeWebView(harness)
+        var notices: [NavigationNotice] = []
+        delegate.onNavigationNotice = { notices.append($0) }
         harness.action = { action, handler in
             delegate.webView(webView, decidePolicyFor: action) { policy in
                 XCTAssertEqual(policy, .cancel)
@@ -125,6 +131,7 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
         }
         webView.load(URLRequest(url: URL(string: "https://example.invalid/login")!))
         await fulfillment(of: [finished], timeout: 10)
+        XCTAssertEqual(notices.map(\.message), ["已拦截 example.invalid：TapAsk 只在浮窗里打开 ChatGPT 和常见登录页"])
         webView.stopLoading()
         withExtendedLifetime(harness) {}
     }
@@ -136,6 +143,8 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
         let harness = NavigationHarness()
         let finished = expectation(description: "WebKit final response cancelled")
         let webView = makeWebView(harness)
+        var notices: [NavigationNotice] = []
+        delegate.onNavigationNotice = { notices.append($0) }
         // The custom scheme supplies local bytes with an HTTPS response URL, so
         // cancellation must come from main-frame host trust, not the scheme check.
         // Bypass only the fixture action; any unexpected navigation stays offline.
@@ -160,6 +169,8 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
         }
         webView.load(URLRequest(url: URL(string: "fixture://example.invalid/login")!))
         await fulfillment(of: [finished], timeout: 10)
+        XCTAssertEqual(notices.map(\.host), ["example.invalid"])
+        XCTAssertEqual(notices.map(\.kind), [.blocked])
         webView.stopLoading()
         withExtendedLifetime(harness) {}
     }
@@ -173,6 +184,8 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
         let webView = makeWebView(harness, allowsAutomaticWindows: true, productionDelegate: delegate)
         let destination = URL(string: "https://chatgpt.com/c/fixture-conversation")!
         var popupCreationCount = 0
+        var notices: [NavigationNotice] = []
+        delegate.onNavigationNotice = { notices.append($0) }
         harness.action = { action, handler in
             if action.targetFrame == nil {
                 delegate.webView(webView, decidePolicyFor: action) { policy in
@@ -211,6 +224,7 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
         loadWindowOpen(to: destination.absoluteString, in: webView)
         await fulfillment(of: [newWindowRequested, mainNavigation], timeout: 3)
         XCTAssertEqual(popupCreationCount, 0)
+        XCTAssertTrue(notices.isEmpty, "Allowed provider windows handled inline must remain silent")
         withExtendedLifetime(harness) {}
     }
 
@@ -371,6 +385,8 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
         let popupRequested = expectation(description: "Disallowed window.open reaches the UI delegate")
         let webView = makeWebView(harness, allowsAutomaticWindows: true)
         var popupCreationCount = 0
+        var notices: [NavigationNotice] = []
+        delegate.onNavigationNotice = { notices.append($0) }
         harness.action = { action, handler in
             allowInMemoryHTMLOrPopup(action, handler: handler)
         }
@@ -399,6 +415,8 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
         loadWindowOpen(to: "https://example.invalid/fixture-login", in: webView)
         await fulfillment(of: [popupRequested], timeout: 3)
         XCTAssertEqual(popupCreationCount, 0)
+        XCTAssertEqual(notices.map(\.host), ["example.invalid"])
+        XCTAssertEqual(notices.map(\.kind), [.blocked])
         withExtendedLifetime(harness) {}
     }
 

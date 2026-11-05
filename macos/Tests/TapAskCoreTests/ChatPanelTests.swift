@@ -81,6 +81,10 @@ final class ChatPanelTests: XCTestCase {
         let webView = WKWebView(frame: .zero, configuration: configuration)
         panel.contentView = webView
         panel.orderFront(nil)
+        panel.showNavigationNotice(try XCTUnwrap(navigationNotice(for: .action, mainFrame: true,
+            decision: .cancel, host: "example.invalid", providerName: "ChatGPT")))
+        let notice = try XCTUnwrap(webView.subviews.compactMap { $0 as? NavigationNoticeView }.first)
+        let badge = try XCTUnwrap(webView.subviews.compactMap { $0 as? OriginBadgeView }.first)
 
         for size in [NSSize(width: 480, height: 720), NSSize(width: 360, height: 720),
                      NSSize(width: 480, height: 480), NSSize(width: 360, height: 480)] {
@@ -90,6 +94,16 @@ final class ChatPanelTests: XCTestCase {
                 let frameView = try XCTUnwrap(panel.contentView?.superview)
                 frameView.layoutSubtreeIfNeeded()
                 XCTAssertEqual(webView.frame, frameView.bounds)
+                XCTAssertFalse(notice.isHidden)
+                XCTAssertTrue(webView.bounds.contains(notice.frame))
+                XCTAssertEqual(notice.frame.midX, webView.bounds.midX, accuracy: 0.5)
+                let noticeTop = webView.isFlipped ? notice.frame.minY : webView.bounds.maxY - notice.frame.maxY
+                let badgeBottom = webView.isFlipped ? badge.frame.maxY : webView.bounds.maxY - badge.frame.minY
+                XCTAssertEqual(noticeTop, origin.isEmpty ? 10 : badgeBottom + 6, accuracy: 0.5)
+                let noticePoint = frameView.convert(NSPoint(x: notice.bounds.midX, y: notice.bounds.midY), from: notice)
+                let noticeHit = frameView.hitTest(noticePoint)
+                XCTAssertTrue(noticeHit === webView || noticeHit?.isDescendant(of: webView) == true)
+                XCTAssertFalse(noticeHit === notice || noticeHit?.isDescendant(of: notice) == true)
                 // Nine points is inside the top ten, immediately below the drag strip.
                 for depth: CGFloat in [9, 20, 28] {
                     let hit = frameView.hitTest(point(atDepth: depth, in: frameView))
@@ -97,6 +111,7 @@ final class ChatPanelTests: XCTestCase {
                                   "Top \(depth)pt hit \(String(describing: hit)); must reach WKWebView")
                     XCTAssertFalse(hit is PanelDragView)
                     XCTAssertFalse(hit is OriginBadgeView)
+                    XCTAssertFalse(hit is NavigationNoticeView)
                 }
                 let drag = frameView.hitTest(point(atDepth: 4, in: frameView))
                 XCTAssertTrue(drag is PanelDragView)
@@ -116,6 +131,8 @@ final class ChatPanelTests: XCTestCase {
         let previous = NSView()
         let current = NSView()
         panel.contentView = previous
+        panel.showNavigationNotice(try XCTUnwrap(navigationNotice(for: .action, mainFrame: true,
+            decision: .browser, host: "example.invalid", providerName: "ChatGPT")))
         panel.origin = "https://accounts.google.com"
         panel.updateLoadState(.failed(PageLoadFailure(domain: "NSURLErrorDomain", code: -1001)),
                               providerName: "ChatGPT")
@@ -126,6 +143,8 @@ final class ChatPanelTests: XCTestCase {
         XCTAssertTrue(previous.subviews.isEmpty)
         XCTAssertEqual(current.subviews.filter { $0 is PanelDragView }.count, 1)
         XCTAssertEqual(current.subviews.filter { $0 is PageLoadOverlayView }.count, 1)
+        let notice = try XCTUnwrap(current.subviews.compactMap { $0 as? NavigationNoticeView }.first)
+        XCTAssertTrue(notice.isHidden, "A provider switch must clear the previous page's notice")
         XCTAssertFalse(loadOverlay.isHidden)
         XCTAssertFalse(badge.isHidden)
         XCTAssertEqual(badge.origin, panel.origin)
@@ -208,6 +227,58 @@ final class ChatPanelTests: XCTestCase {
             .contains { $0.stringValue == "正在打开 DeepSeek…" })
         overlay.update(.loaded, providerName: "DeepSeek")
         XCTAssertTrue(overlay.isHidden)
+    }
+
+    @MainActor
+    func testLoginPopupNavigationNoticeFitsAndPassesClicksThrough() throws {
+        _ = NSApplication.shared
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        let popup = LoginPopup(configuration: configuration, policy: try SharedFixtures.chatGPTPolicy(), initialURL: nil)
+        defer { popup.dispose() }
+        let delegate = try XCTUnwrap(popup.webView.navigationDelegate as? WebViewDelegate)
+        let notice = try XCTUnwrap(popup.webView.subviews.compactMap { $0 as? NavigationNoticeView }.first)
+        let message = try XCTUnwrap(navigationNotice(for: .response, mainFrame: true, decision: .cancel,
+            host: "a-long-login-hostname.example.invalid", providerName: "ChatGPT"))
+        delegate.onNavigationNotice?(message)
+        for size in [NSSize(width: 480, height: 640), NSSize(width: 360, height: 640),
+                     NSSize(width: 480, height: 480), NSSize(width: 360, height: 480)] {
+            popup.panel.setContentSize(size)
+            popup.webView.layoutSubtreeIfNeeded()
+            XCTAssertFalse(notice.isHidden)
+            XCTAssertTrue(popup.webView.bounds.contains(notice.frame))
+            XCTAssertEqual(notice.frame.midX, popup.webView.bounds.midX, accuracy: 0.5)
+            let top = popup.webView.isFlipped ? notice.frame.minY : popup.webView.bounds.maxY - notice.frame.maxY
+            XCTAssertEqual(top, 10, accuracy: 0.5)
+            let label = try XCTUnwrap(notice.subviews.first as? NSTextField)
+            XCTAssertEqual(label.stringValue, message.message)
+            XCTAssertGreaterThan(label.frame.height, 14, "The full message must wrap at narrow window widths")
+            XCTAssertNil(notice.hitTest(NSPoint(x: notice.frame.midX, y: notice.frame.midY)))
+            let frameView = try XCTUnwrap(popup.webView.superview)
+            let point = frameView.convert(NSPoint(x: notice.bounds.midX, y: notice.bounds.midY), from: notice)
+            let hit = frameView.hitTest(point)
+            XCTAssertTrue(hit === popup.webView || hit?.isDescendant(of: popup.webView) == true)
+            XCTAssertFalse(hit === notice || hit?.isDescendant(of: notice) == true)
+        }
+    }
+
+    @MainActor
+    func testNavigationNoticeReplacementGetsSixSecondsAndDuplicateDoesNotExtendIt() async throws {
+        let view = NavigationNoticeView()
+        let blocked = try XCTUnwrap(navigationNotice(for: .action, mainFrame: true, decision: .cancel,
+                                                    host: "example.invalid", providerName: "ChatGPT"))
+        let browser = try XCTUnwrap(navigationNotice(for: .action, mainFrame: true, decision: .browser,
+                                                    host: "example.invalid", providerName: "ChatGPT"))
+        view.show(blocked)
+        XCTAssertFalse(view.isHidden)
+        try await Task.sleep(for: .seconds(1))
+        view.show(browser)
+        try await Task.sleep(for: .milliseconds(5200))
+        XCTAssertFalse(view.isHidden, "The first notice's timer must not dismiss its replacement")
+        XCTAssertEqual((view.subviews.first as? NSTextField)?.stringValue, browser.message)
+        view.show(browser)
+        try await Task.sleep(for: .milliseconds(1100))
+        XCTAssertTrue(view.isHidden, "A duplicate must not restart the six-second dismissal")
     }
 
     @MainActor
