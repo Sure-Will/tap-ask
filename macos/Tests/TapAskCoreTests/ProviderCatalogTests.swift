@@ -3,12 +3,22 @@ import XCTest
 import TapAskCore
 
 final class ProviderCatalogTests: XCTestCase {
-    func testSharedProviderCatalogIncludesBothProvidersAndValidHTTPSHomes() throws {
+    func testSharedProviderCatalogIncludesSixProvidersInDefaultOrderAndValidHTTPSHomes() throws {
         let catalog = try SharedFixtures.catalog()
-        XCTAssertEqual(catalog.providers.map(\.id), ["chatgpt", "deepseek"])
-        XCTAssertTrue(catalog.providers.contains { $0.name == "ChatGPT" && $0.home.host == "chatgpt.com" })
-        XCTAssertTrue(catalog.providers.contains { $0.name == "DeepSeek" && $0.home.absoluteString == "https://chat.deepseek.com/" })
-        XCTAssertFalse(catalog.providers.isEmpty)
+        XCTAssertEqual(catalog.providers.count, 6)
+        XCTAssertEqual(catalog.providers.map(\.id), ["chatgpt", "claude", "gemini", "deepseek", "grok", "doubao"])
+        XCTAssertEqual(catalog.providers.map(\.name), ["ChatGPT", "Claude", "Gemini", "DeepSeek", "Grok", "豆包"])
+        XCTAssertEqual(catalog.providers.map { $0.home.absoluteString },
+                       ["https://chatgpt.com/", "https://claude.ai/", "https://gemini.google.com/app",
+                        "https://chat.deepseek.com/", "https://grok.com/", "https://www.doubao.com/chat/"])
+        XCTAssertEqual(catalog.providers.map(\.hosts), [
+            ["chatgpt.com", "chat.openai.com", "auth.openai.com", "auth0.openai.com", "setup.auth.openai.com"],
+            ["claude.ai"], ["gemini.google.com"], ["chat.deepseek.com"],
+            ["grok.com", "accounts.x.ai"], ["www.doubao.com"],
+        ])
+        XCTAssertEqual(catalog.identityHosts, ["accounts.google.com", "accounts.youtube.com", "appleid.apple.com",
+                                              "account.apple.com", "login.microsoftonline.com", "login.microsoft.com",
+                                              "login.live.com", "account.live.com"])
         XCTAssertEqual(Set(catalog.providers.map(\.id)).count, catalog.providers.count)
 
         var allHosts = catalog.identityHosts

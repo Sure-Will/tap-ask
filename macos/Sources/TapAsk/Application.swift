@@ -26,6 +26,10 @@ enum TapAskApplication {
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var panel: ChatPanel!
     private var catalog: ProviderCatalog!
+    private var orderedProviders: [Provider] = []
+    private var providerOrderWindow: ProviderOrderWindowController?
+    private var providerMenu: NSMenu?
+    private var statusMenu: NSMenu?
     private var sessions: [String: ProviderSession] = [:]
     private var currentSession: ProviderSession!
     private var loginPopup: LoginPopup?
@@ -41,7 +45,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             || launchEvent?.paramDescriptor(forKeyword: keyAELaunchedAsLogInItem) != nil
 
         catalog = loadProviders()
-        guard let provider = ProviderSelection.restored(in: catalog.providers,
+        orderedProviders = ProviderOrder.ordered(catalog.providers,
+                                                 savedIDs: UserDefaults.standard.stringArray(forKey: "ProviderOrder"))
+        guard let provider = ProviderSelection.restored(in: orderedProviders,
                                                         savedID: UserDefaults.standard.string(forKey: "LastProviderID")) else {
             fatalError("TapAsk: providers.json 必须至少包含一个服务商。")
         }
@@ -210,14 +216,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc private func togglePanelFromMenu(_ sender: Any?) { togglePanel() }
 
     @objc private func selectProvider(_ sender: NSMenuItem) {
-        guard let provider = ProviderSelection.provider(at: sender.tag, in: catalog.providers) else { return }
+        guard let provider = ProviderSelection.provider(at: sender.tag, in: orderedProviders) else { return }
         switchProvider(to: provider)
         presentPanel()
     }
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(selectProvider(_:)) {
-            let provider = ProviderSelection.provider(at: menuItem.tag, in: catalog.providers)
+            let provider = ProviderSelection.provider(at: menuItem.tag, in: orderedProviders)
             menuItem.state = provider?.id == currentSession.policy.provider.id ? .on : .off
         } else if menuItem.action == #selector(togglePanelFromMenu(_:)) {
             menuItem.title = panelVisibilityMenuTitle(isVisible: panel.isVisible)
@@ -226,7 +232,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     private func makeProviderMenuItems() -> [NSMenuItem] {
-        TapAsk.makeProviderMenuItems(providers: catalog.providers,
+        TapAsk.makeProviderMenuItems(providers: orderedProviders,
                                     currentProviderID: currentSession.policy.provider.id,
                                     target: self, action: #selector(selectProvider(_:)))
     }
@@ -234,12 +240,55 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private func installStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.image = makeStatusImage()
-        item.button?.toolTip = "TapAsk"
-        item.menu = makeStatusMenu(isPanelVisible: panel.isVisible,
-                                   providerItems: makeProviderMenuItems(), target: self,
-                                   toggleAction: #selector(togglePanelFromMenu(_:)),
-                                   reloadAction: #selector(reloadPage(_:)))
+        item.button?.toolTip = "TapAsk — 单击呼出，右键菜单"
+        item.button?.target = self
+        item.button?.action = #selector(statusItemClicked(_:))
+        item.button?.sendAction(on: [.leftMouseUp, .rightMouseUp])
         statusItem = item
+    }
+
+    @objc private func statusItemClicked(_ sender: Any?) {
+        let event = NSApp.currentEvent
+        if event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
+            guard let statusItem, let button = statusItem.button else { return }
+            statusMenu = makeCurrentStatusMenu()
+            // Let NSStatusItem position and track the menu directly below its button.
+            statusItem.menu = statusMenu
+            defer { statusItem.menu = nil }
+            button.performClick(nil)
+        } else {
+            togglePanel()
+        }
+    }
+
+    private func makeCurrentStatusMenu() -> NSMenu {
+        makeStatusMenu(isPanelVisible: panel.isVisible, providerItems: makeProviderMenuItems(), target: self,
+                       toggleAction: #selector(togglePanelFromMenu(_:)),
+                       orderAction: #selector(showProviderOrder(_:)), reloadAction: #selector(reloadPage(_:)))
+    }
+
+    private func rebuildProviderMenus() {
+        providerMenu?.removeAllItems()
+        for item in makeProviderMenuItems() { providerMenu?.addItem(item) }
+        statusMenu = makeCurrentStatusMenu()
+    }
+
+    @objc private func showProviderOrder(_ sender: Any?) {
+        if providerOrderWindow == nil {
+            let controller = ProviderOrderWindowController(providers: orderedProviders)
+            controller.onOrderChange = { [weak self] ids in self?.saveProviderOrder(ids) }
+            providerOrderWindow = controller
+        }
+        needsWebFocus = false
+        providerOrderWindow?.present()
+    }
+
+    private func saveProviderOrder(_ ids: [String]?) {
+        if let ids { UserDefaults.standard.set(ids, forKey: "ProviderOrder") }
+        else { UserDefaults.standard.removeObject(forKey: "ProviderOrder") }
+        orderedProviders = ProviderOrder.ordered(catalog.providers, savedIDs: ids)
+        providerOrderWindow?.update(providers: orderedProviders)
+        rebuildProviderMenus()
     }
 
     private func loadProviders() -> ProviderCatalog {
@@ -291,7 +340,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let reload = viewMenu.addItem(withTitle: "重新加载", action: #selector(reloadPage(_:)), keyEquivalent: "r")
         reload.target = self
         let providerMenu = NSMenu(title: "服务商")
-        for item in makeProviderMenuItems() { providerMenu.addItem(item) }
+        self.providerMenu = providerMenu
+        rebuildProviderMenus()
         for submenu in [appMenu, editMenu, providerMenu, viewMenu] {
             let item = NSMenuItem(title: submenu.title, action: nil, keyEquivalent: "")
             item.submenu = submenu

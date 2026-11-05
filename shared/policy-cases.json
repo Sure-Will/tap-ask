@@ -250,6 +250,265 @@
       "provider": "deepseek",
       "url": "https://chatgpt.com/",
       "expected": false
+    },
+    {
+      "id": "claude-home",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "https://claude.ai/",
+      "expected": true
+    },
+    {
+      "id": "claude-http-downgrade",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "http://claude.ai/",
+      "expected": false
+    },
+    {
+      "id": "claude-untrusted-host-1",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "https://claude.ai.evil.example/",
+      "expected": false
+    },
+    {
+      "id": "claude-untrusted-host-2",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "https://evilclaude.ai/",
+      "expected": false
+    },
+    {
+      "id": "claude-google-login",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "https://accounts.google.com/ServiceLogin",
+      "expected": true
+    },
+    {
+      "id": "claude-google-cross-domain-login",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "https://accounts.youtube.com/accounts/SetSID",
+      "expected": true
+    },
+    {
+      "id": "claude-cross-provider",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "https://chatgpt.com/",
+      "expected": false
+    },
+    {
+      "id": "gemini-home",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://gemini.google.com/app",
+      "expected": true
+    },
+    {
+      "id": "gemini-http-downgrade",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "http://gemini.google.com/app",
+      "expected": false
+    },
+    {
+      "id": "gemini-untrusted-host-1",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://gemini.google.com.evil.example/",
+      "expected": false
+    },
+    {
+      "id": "gemini-untrusted-host-2",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://evilgemini.google.com/",
+      "expected": false
+    },
+    {
+      "id": "gemini-untrusted-host-3",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://google.com/",
+      "expected": false
+    },
+    {
+      "id": "gemini-google-login",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://accounts.google.com/ServiceLogin",
+      "expected": true
+    },
+    {
+      "id": "gemini-google-cross-domain-login",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://accounts.youtube.com/accounts/SetSID",
+      "expected": true
+    },
+    {
+      "id": "gemini-cross-provider",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://chatgpt.com/",
+      "expected": false
+    },
+    {
+      "id": "grok-home",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://grok.com/",
+      "expected": true
+    },
+    {
+      "id": "grok-http-downgrade",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "http://grok.com/",
+      "expected": false
+    },
+    {
+      "id": "grok-untrusted-host-1",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://grok.com.evil.example/",
+      "expected": false
+    },
+    {
+      "id": "grok-untrusted-host-2",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://evilgrok.com/",
+      "expected": false
+    },
+    {
+      "id": "grok-untrusted-host-3",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://x.com/",
+      "expected": false
+    },
+    {
+      "id": "grok-google-login",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://accounts.google.com/ServiceLogin",
+      "expected": true
+    },
+    {
+      "id": "grok-google-cross-domain-login",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://accounts.youtube.com/accounts/SetSID",
+      "expected": true
+    },
+    {
+      "id": "grok-cross-provider",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://chatgpt.com/",
+      "expected": false
+    },
+    {
+      "id": "doubao-home",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://www.doubao.com/chat/",
+      "expected": true
+    },
+    {
+      "id": "doubao-http-downgrade",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "http://www.doubao.com/chat/",
+      "expected": false
+    },
+    {
+      "id": "doubao-untrusted-host-1",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://www.doubao.com.evil.example/",
+      "expected": false
+    },
+    {
+      "id": "doubao-untrusted-host-2",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://evilwww.doubao.com/",
+      "expected": false
+    },
+    {
+      "id": "doubao-untrusted-host-3",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://doubao.com/",
+      "expected": false
+    },
+    {
+      "id": "doubao-google-login",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://accounts.google.com/ServiceLogin",
+      "expected": true
+    },
+    {
+      "id": "doubao-google-cross-domain-login",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://accounts.youtube.com/accounts/SetSID",
+      "expected": true
+    },
+    {
+      "id": "doubao-cross-provider",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://chatgpt.com/",
+      "expected": false
+    },
+    {
+      "id": "chatgpt-grok-accounts",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "chatgpt",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "expected": false
+    },
+    {
+      "id": "claude-grok-accounts",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "claude",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "expected": false
+    },
+    {
+      "id": "gemini-grok-accounts",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "gemini",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "expected": false
+    },
+    {
+      "id": "deepseek-grok-accounts",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "deepseek",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "expected": false
+    },
+    {
+      "id": "grok-grok-accounts",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "grok",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "expected": true
+    },
+    {
+      "id": "doubao-grok-accounts",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "doubao",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "expected": false
     }
   ],
   "actions": [
@@ -657,6 +916,666 @@
       "wantsDownload": false,
       "sourceURL": "https://chatgpt.com/",
       "expected": "cancel"
+    },
+    {
+      "id": "claude-home-action",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "https://claude.ai/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://claude.ai/",
+      "expected": "allow"
+    },
+    {
+      "id": "claude-http-downgrade-action",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "http://claude.ai/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://claude.ai/",
+      "expected": "cancel"
+    },
+    {
+      "id": "claude-untrusted-host-1-action",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "https://claude.ai.evil.example/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://claude.ai/",
+      "expected": "cancel"
+    },
+    {
+      "id": "claude-untrusted-host-2-action",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "https://evilclaude.ai/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://claude.ai/",
+      "expected": "cancel"
+    },
+    {
+      "id": "claude-google-login-action",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "https://accounts.google.com/ServiceLogin",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://claude.ai/",
+      "expected": "allow"
+    },
+    {
+      "id": "claude-google-cross-domain-login-action",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "https://accounts.youtube.com/accounts/SetSID",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://claude.ai/",
+      "expected": "allow"
+    },
+    {
+      "id": "claude-cross-provider-action",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "https://chatgpt.com/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://claude.ai/",
+      "expected": "cancel"
+    },
+    {
+      "id": "claude-cross-provider-click",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "https://chatgpt.com/",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://claude.ai/",
+      "expected": "browser"
+    },
+    {
+      "id": "chatgpt-claude-script",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "chatgpt",
+      "url": "https://claude.ai/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/",
+      "expected": "cancel"
+    },
+    {
+      "id": "chatgpt-claude-click",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "chatgpt",
+      "url": "https://claude.ai/",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/",
+      "expected": "browser"
+    },
+    {
+      "id": "gemini-home-action",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://gemini.google.com/app",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://gemini.google.com/app",
+      "expected": "allow"
+    },
+    {
+      "id": "gemini-http-downgrade-action",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "http://gemini.google.com/app",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://gemini.google.com/app",
+      "expected": "cancel"
+    },
+    {
+      "id": "gemini-untrusted-host-1-action",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://gemini.google.com.evil.example/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://gemini.google.com/app",
+      "expected": "cancel"
+    },
+    {
+      "id": "gemini-untrusted-host-2-action",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://evilgemini.google.com/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://gemini.google.com/app",
+      "expected": "cancel"
+    },
+    {
+      "id": "gemini-untrusted-host-3-action",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://google.com/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://gemini.google.com/app",
+      "expected": "cancel"
+    },
+    {
+      "id": "gemini-google-login-action",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://accounts.google.com/ServiceLogin",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://gemini.google.com/app",
+      "expected": "allow"
+    },
+    {
+      "id": "gemini-google-cross-domain-login-action",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://accounts.youtube.com/accounts/SetSID",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://gemini.google.com/app",
+      "expected": "allow"
+    },
+    {
+      "id": "gemini-cross-provider-action",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://chatgpt.com/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://gemini.google.com/app",
+      "expected": "cancel"
+    },
+    {
+      "id": "gemini-cross-provider-click",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://chatgpt.com/",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://gemini.google.com/app",
+      "expected": "browser"
+    },
+    {
+      "id": "chatgpt-gemini-script",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "chatgpt",
+      "url": "https://gemini.google.com/app",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/",
+      "expected": "cancel"
+    },
+    {
+      "id": "chatgpt-gemini-click",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "chatgpt",
+      "url": "https://gemini.google.com/app",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/",
+      "expected": "browser"
+    },
+    {
+      "id": "grok-home-action",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://grok.com/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://grok.com/",
+      "expected": "allow"
+    },
+    {
+      "id": "grok-http-downgrade-action",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "http://grok.com/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://grok.com/",
+      "expected": "cancel"
+    },
+    {
+      "id": "grok-untrusted-host-1-action",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://grok.com.evil.example/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://grok.com/",
+      "expected": "cancel"
+    },
+    {
+      "id": "grok-untrusted-host-2-action",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://evilgrok.com/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://grok.com/",
+      "expected": "cancel"
+    },
+    {
+      "id": "grok-untrusted-host-3-action",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://x.com/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://grok.com/",
+      "expected": "cancel"
+    },
+    {
+      "id": "grok-google-login-action",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://accounts.google.com/ServiceLogin",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://grok.com/",
+      "expected": "allow"
+    },
+    {
+      "id": "grok-google-cross-domain-login-action",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://accounts.youtube.com/accounts/SetSID",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://grok.com/",
+      "expected": "allow"
+    },
+    {
+      "id": "grok-cross-provider-action",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://chatgpt.com/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://grok.com/",
+      "expected": "cancel"
+    },
+    {
+      "id": "grok-cross-provider-click",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://chatgpt.com/",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://grok.com/",
+      "expected": "browser"
+    },
+    {
+      "id": "chatgpt-grok-script",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "chatgpt",
+      "url": "https://grok.com/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/",
+      "expected": "cancel"
+    },
+    {
+      "id": "chatgpt-grok-click",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "chatgpt",
+      "url": "https://grok.com/",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/",
+      "expected": "browser"
+    },
+    {
+      "id": "doubao-home-action",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://www.doubao.com/chat/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://www.doubao.com/chat/",
+      "expected": "allow"
+    },
+    {
+      "id": "doubao-http-downgrade-action",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "http://www.doubao.com/chat/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://www.doubao.com/chat/",
+      "expected": "cancel"
+    },
+    {
+      "id": "doubao-untrusted-host-1-action",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://www.doubao.com.evil.example/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://www.doubao.com/chat/",
+      "expected": "cancel"
+    },
+    {
+      "id": "doubao-untrusted-host-2-action",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://evilwww.doubao.com/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://www.doubao.com/chat/",
+      "expected": "cancel"
+    },
+    {
+      "id": "doubao-untrusted-host-3-action",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://doubao.com/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://www.doubao.com/chat/",
+      "expected": "cancel"
+    },
+    {
+      "id": "doubao-google-login-action",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://accounts.google.com/ServiceLogin",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://www.doubao.com/chat/",
+      "expected": "allow"
+    },
+    {
+      "id": "doubao-google-cross-domain-login-action",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://accounts.youtube.com/accounts/SetSID",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://www.doubao.com/chat/",
+      "expected": "allow"
+    },
+    {
+      "id": "doubao-cross-provider-action",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://chatgpt.com/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://www.doubao.com/chat/",
+      "expected": "cancel"
+    },
+    {
+      "id": "doubao-cross-provider-click",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://chatgpt.com/",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://www.doubao.com/chat/",
+      "expected": "browser"
+    },
+    {
+      "id": "chatgpt-doubao-script",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "chatgpt",
+      "url": "https://www.doubao.com/chat/",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/",
+      "expected": "cancel"
+    },
+    {
+      "id": "chatgpt-doubao-click",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "chatgpt",
+      "url": "https://www.doubao.com/chat/",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/",
+      "expected": "browser"
+    },
+    {
+      "id": "chatgpt-grok-accounts-script",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "chatgpt",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/",
+      "expected": "cancel"
+    },
+    {
+      "id": "chatgpt-grok-accounts-click",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "chatgpt",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/",
+      "expected": "browser"
+    },
+    {
+      "id": "claude-grok-accounts-script",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "claude",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://claude.ai/",
+      "expected": "cancel"
+    },
+    {
+      "id": "claude-grok-accounts-click",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "claude",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://claude.ai/",
+      "expected": "browser"
+    },
+    {
+      "id": "gemini-grok-accounts-script",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "gemini",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://gemini.google.com/app",
+      "expected": "cancel"
+    },
+    {
+      "id": "gemini-grok-accounts-click",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "gemini",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://gemini.google.com/app",
+      "expected": "browser"
+    },
+    {
+      "id": "deepseek-grok-accounts-script",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "deepseek",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chat.deepseek.com/",
+      "expected": "cancel"
+    },
+    {
+      "id": "deepseek-grok-accounts-click",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "deepseek",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chat.deepseek.com/",
+      "expected": "browser"
+    },
+    {
+      "id": "grok-grok-accounts-script",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "grok",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://grok.com/",
+      "expected": "allow"
+    },
+    {
+      "id": "grok-grok-accounts-click",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "grok",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://grok.com/",
+      "expected": "allow"
+    },
+    {
+      "id": "doubao-grok-accounts-script",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "doubao",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://www.doubao.com/chat/",
+      "expected": "cancel"
+    },
+    {
+      "id": "doubao-grok-accounts-click",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "doubao",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://www.doubao.com/chat/",
+      "expected": "browser"
     }
   ],
   "responses": [
@@ -899,6 +1818,376 @@
       "canDisplay": true,
       "attachment": false,
       "expected": "allow"
+    },
+    {
+      "id": "claude-home-response",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "https://claude.ai/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
+    },
+    {
+      "id": "claude-http-downgrade-response",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "http://claude.ai/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "claude-untrusted-host-1-response",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "https://claude.ai.evil.example/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "claude-untrusted-host-2-response",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "https://evilclaude.ai/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "claude-google-login-response",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "https://accounts.google.com/ServiceLogin",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
+    },
+    {
+      "id": "claude-google-cross-domain-login-response",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "https://accounts.youtube.com/accounts/SetSID",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
+    },
+    {
+      "id": "claude-cross-provider-response",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "https://chatgpt.com/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "gemini-home-response",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://gemini.google.com/app",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
+    },
+    {
+      "id": "gemini-http-downgrade-response",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "http://gemini.google.com/app",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "gemini-untrusted-host-1-response",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://gemini.google.com.evil.example/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "gemini-untrusted-host-2-response",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://evilgemini.google.com/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "gemini-untrusted-host-3-response",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://google.com/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "gemini-google-login-response",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://accounts.google.com/ServiceLogin",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
+    },
+    {
+      "id": "gemini-google-cross-domain-login-response",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://accounts.youtube.com/accounts/SetSID",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
+    },
+    {
+      "id": "gemini-cross-provider-response",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://chatgpt.com/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "grok-home-response",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://grok.com/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
+    },
+    {
+      "id": "grok-http-downgrade-response",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "http://grok.com/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "grok-untrusted-host-1-response",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://grok.com.evil.example/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "grok-untrusted-host-2-response",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://evilgrok.com/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "grok-untrusted-host-3-response",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://x.com/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "grok-google-login-response",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://accounts.google.com/ServiceLogin",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
+    },
+    {
+      "id": "grok-google-cross-domain-login-response",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://accounts.youtube.com/accounts/SetSID",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
+    },
+    {
+      "id": "grok-cross-provider-response",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://chatgpt.com/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "doubao-home-response",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://www.doubao.com/chat/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
+    },
+    {
+      "id": "doubao-http-downgrade-response",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "http://www.doubao.com/chat/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "doubao-untrusted-host-1-response",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://www.doubao.com.evil.example/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "doubao-untrusted-host-2-response",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://evilwww.doubao.com/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "doubao-untrusted-host-3-response",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://doubao.com/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "doubao-google-login-response",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://accounts.google.com/ServiceLogin",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
+    },
+    {
+      "id": "doubao-google-cross-domain-login-response",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://accounts.youtube.com/accounts/SetSID",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
+    },
+    {
+      "id": "doubao-cross-provider-response",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://chatgpt.com/",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "chatgpt-grok-accounts-response",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "chatgpt",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "claude-grok-accounts-response",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "claude",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "gemini-grok-accounts-response",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "gemini",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "deepseek-grok-accounts-response",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "deepseek",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "grok-grok-accounts-response",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "grok",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
+    },
+    {
+      "id": "doubao-grok-accounts-response",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "doubao",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
     }
   ],
   "origins": [
@@ -966,6 +2255,118 @@
       "provider": "deepseek",
       "url": "https://chatgpt.com/",
       "expected": "https://chatgpt.com",
+      "isProviderURL": false
+    },
+    {
+      "id": "claude-own-origin",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "https://claude.ai/?token=secret",
+      "expected": "https://claude.ai",
+      "isProviderURL": true
+    },
+    {
+      "id": "claude-identity-origin",
+      "group": "testClaudeNavigationAndOrigins",
+      "provider": "claude",
+      "url": "https://accounts.google.com/ServiceLogin?token=secret",
+      "expected": "https://accounts.google.com",
+      "isProviderURL": false
+    },
+    {
+      "id": "gemini-own-origin",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://gemini.google.com/app?token=secret",
+      "expected": "https://gemini.google.com",
+      "isProviderURL": true
+    },
+    {
+      "id": "gemini-identity-origin",
+      "group": "testGeminiNavigationAndOrigins",
+      "provider": "gemini",
+      "url": "https://accounts.google.com/ServiceLogin?token=secret",
+      "expected": "https://accounts.google.com",
+      "isProviderURL": false
+    },
+    {
+      "id": "grok-own-origin",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://grok.com/?token=secret",
+      "expected": "https://grok.com",
+      "isProviderURL": true
+    },
+    {
+      "id": "grok-identity-origin",
+      "group": "testGrokNavigationAndOrigins",
+      "provider": "grok",
+      "url": "https://accounts.google.com/ServiceLogin?token=secret",
+      "expected": "https://accounts.google.com",
+      "isProviderURL": false
+    },
+    {
+      "id": "doubao-own-origin",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://www.doubao.com/chat/?token=secret",
+      "expected": "https://www.doubao.com",
+      "isProviderURL": true
+    },
+    {
+      "id": "doubao-identity-origin",
+      "group": "testDoubaoNavigationAndOrigins",
+      "provider": "doubao",
+      "url": "https://accounts.google.com/ServiceLogin?token=secret",
+      "expected": "https://accounts.google.com",
+      "isProviderURL": false
+    },
+    {
+      "id": "chatgpt-grok-accounts-origin",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "chatgpt",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "expected": "https://accounts.x.ai",
+      "isProviderURL": false
+    },
+    {
+      "id": "claude-grok-accounts-origin",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "claude",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "expected": "https://accounts.x.ai",
+      "isProviderURL": false
+    },
+    {
+      "id": "gemini-grok-accounts-origin",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "gemini",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "expected": "https://accounts.x.ai",
+      "isProviderURL": false
+    },
+    {
+      "id": "deepseek-grok-accounts-origin",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "deepseek",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "expected": "https://accounts.x.ai",
+      "isProviderURL": false
+    },
+    {
+      "id": "grok-grok-accounts-origin",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "grok",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "expected": "https://accounts.x.ai",
+      "isProviderURL": true
+    },
+    {
+      "id": "doubao-grok-accounts-origin",
+      "group": "testGrokAccountsHostIsProviderSpecific",
+      "provider": "doubao",
+      "url": "https://accounts.x.ai/sign-in?token=secret",
+      "expected": "https://accounts.x.ai",
       "isProviderURL": false
     }
   ]

@@ -4,6 +4,10 @@
   "providers": [
     { "id": "chatgpt", "name": "ChatGPT", "home": "https://chatgpt.com/",
       "hosts": ["chatgpt.com", "chat.openai.com", "auth.openai.com", "auth0.openai.com", "setup.auth.openai.com"] },
-    { "id": "deepseek", "name": "DeepSeek", "home": "https://chat.deepseek.com/", "hosts": ["chat.deepseek.com"] }
+    { "id": "claude", "name": "Claude", "home": "https://claude.ai/", "hosts": ["claude.ai"] },
+    { "id": "gemini", "name": "Gemini", "home": "https://gemini.google.com/app", "hosts": ["gemini.google.com"] },
+    { "id": "deepseek", "name": "DeepSeek", "home": "https://chat.deepseek.com/", "hosts": ["chat.deepseek.com"] },
+    { "id": "grok", "name": "Grok", "home": "https://grok.com/", "hosts": ["grok.com", "accounts.x.ai"] },
+    { "id": "doubao", "name": "豆包", "home": "https://www.doubao.com/chat/", "hosts": ["www.doubao.com"] }
   ]
 }

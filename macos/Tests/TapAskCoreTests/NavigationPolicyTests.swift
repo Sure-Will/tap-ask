@@ -43,6 +43,26 @@ final class NavigationPolicyTests: XCTestCase {
         try assertCases(in: "testDeepSeekNavigationAndOrigins")
     }
 
+    func testClaudeNavigationAndOrigins() throws {
+        try assertCases(in: "testClaudeNavigationAndOrigins")
+    }
+
+    func testGeminiNavigationAndOrigins() throws {
+        try assertCases(in: "testGeminiNavigationAndOrigins")
+    }
+
+    func testGrokNavigationAndOrigins() throws {
+        try assertCases(in: "testGrokNavigationAndOrigins")
+    }
+
+    func testDoubaoNavigationAndOrigins() throws {
+        try assertCases(in: "testDoubaoNavigationAndOrigins")
+    }
+
+    func testGrokAccountsHostIsProviderSpecific() throws {
+        try assertCases(in: "testGrokAccountsHostIsProviderSpecific")
+    }
+
     func testUnknownFixtureProviderIsAnError() throws {
         let catalog = try SharedFixtures.catalog()
         XCTAssertEqual(try SharedFixtures.policy(for: nil, in: catalog).provider.id, "chatgpt")

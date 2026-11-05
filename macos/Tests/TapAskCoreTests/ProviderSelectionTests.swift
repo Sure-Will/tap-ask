@@ -18,18 +18,30 @@ final class ProviderSelectionTests: XCTestCase {
     func testRestorationFollowsIDsAcrossReorderingAndRemoval() throws {
         let providers = try SharedFixtures.catalog().providers.reversed()
         XCTAssertEqual(ProviderSelection.restored(in: Array(providers), savedID: "chatgpt")?.id, "chatgpt")
-        XCTAssertEqual(ProviderSelection.restored(in: Array(providers), savedID: "removed-provider")?.id, "deepseek")
+        XCTAssertEqual(ProviderSelection.restored(in: Array(providers), savedID: "removed-provider")?.id, "doubao")
         XCTAssertEqual(ProviderSelection.restored(in: providers.filter { $0.id != "chatgpt" },
-                                                 savedID: "chatgpt")?.id, "deepseek")
+                                                 savedID: "chatgpt")?.id, "doubao")
     }
 
     func testProviderNumbersAreOneBasedAndOutOfRangeReturnsNil() throws {
         let providers = try SharedFixtures.catalog().providers
         XCTAssertEqual(ProviderSelection.provider(at: 1, in: providers)?.id, "chatgpt")
-        XCTAssertEqual(ProviderSelection.provider(at: 2, in: providers)?.id, "deepseek")
-        for number in [Int.min, -1, 0, 3, 9, Int.max] {
+        XCTAssertEqual(ProviderSelection.provider(at: 2, in: providers)?.id, "claude")
+        XCTAssertEqual(ProviderSelection.provider(at: 4, in: providers)?.id, "deepseek")
+        XCTAssertEqual(ProviderSelection.provider(at: 6, in: providers)?.id, "doubao")
+        for number in [Int.min, -1, 0, 7, 9, Int.max] {
             XCTAssertNil(ProviderSelection.provider(at: number, in: providers), "Shortcut \(number)")
         }
+    }
+
+    func testCustomOrderControlsFallbackAndNumberedSelection() throws {
+        let providers = ProviderOrder.ordered(try SharedFixtures.catalog().providers, savedIDs: ["grok", "deepseek"])
+        for savedID: String? in [nil, "", "removed-provider"] {
+            XCTAssertEqual(ProviderSelection.restored(in: providers, savedID: savedID)?.id, "grok")
+        }
+        XCTAssertEqual(ProviderSelection.restored(in: providers, savedID: "claude")?.id, "claude")
+        XCTAssertEqual(ProviderSelection.provider(at: 1, in: providers)?.id, "grok")
+        XCTAssertEqual(ProviderSelection.provider(at: 2, in: providers)?.id, "deepseek")
     }
 
     func testSelectionFromAnEmptyListReturnsNil() {
