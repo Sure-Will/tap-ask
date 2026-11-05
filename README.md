@@ -8,8 +8,8 @@
 
 要求 macOS 14 或更高版本，Apple 芯片和 Intel 芯片都能用。
 
-1. 从 [Releases](https://github.com/Sure-Will/tap-ask/releases) 下载 `TapAsk-<版本>-macOS.zip`，解压。
-2. 把 `TapAsk.app` 拖进“应用程序”文件夹。
+1. 从 [Releases](https://github.com/Sure-Will/tap-ask/releases) 下载 `TapAsk-<版本>-macOS.dmg`，双击打开。
+2. 在打开的窗口里，把 `TapAsk.app` 拖到“应用程序”。
 3. 双击打开。TapAsk 还没有经过 Apple 公证，第一次打开会被 macOS 拦下，提示无法验证它是否安全。被拦下之后，用下面任一方法放行：
    - 打开 系统设置 › 隐私与安全性，在页面下方找到 TapAsk，点“仍要打开”；
    - 或者在终端里运行：
@@ -34,7 +34,7 @@
 
 网页铺满整个浮窗。拖动浮窗最上沿约 8pt 的那一条可以移动窗口，拖动边缘可以调整大小，位置和大小下次打开还在。
 
-每家服务商都直接在浮窗里登录，登录状态保存在本机。跳到 Google 等外部登录页时，浮窗顶部会显示当前所在的网站。网络不通时，浮窗会显示失败原因和“重试”按钮，切回加载失败的服务商也会自动重新加载。
+每家服务商都直接在浮窗里登录，登录状态保存在本机。重新打开时，会恢复各家上次停留的页面；服务商自家页面请求新窗口时，页面仍在主浮窗里打开。跳到 Google 等外部登录页时，浮窗顶部会显示当前所在的网站。网络不通时，浮窗会显示失败原因和“重试”按钮，切回加载失败的服务商也会自动重新加载。
 
 如果按 ⌥空格 没有反应，可能是别的 app 也占用了这个组合键，在那个 app 里改掉即可。
 
@@ -51,6 +51,8 @@ scripts/build-app.sh
 ```
 
 产物是 `macos/build/TapAsk.app`，同时包含 arm64 和 x86_64，使用临时签名。服务商列表在 `shared/providers.json`，导航规则的测试用例在 `shared/policy-cases.json`，行为约定和手工验收清单见 [docs/behavior.md](docs/behavior.md)。
+
+在 `macos/` 下运行 `scripts/make-dmg.sh` 会先构建 app，再生成并校验 `build/TapAsk-<版本>-macOS.dmg`。打包使用系统自带的 `hdiutil`，不需要额外依赖。
 
 菜单栏图标和 App 图标的图形都定义在 `macos/Sources/TapAskCore/BrandMark.swift`，改动后运行 `scripts/make-icons.sh` 重新生成 App 图标。
 

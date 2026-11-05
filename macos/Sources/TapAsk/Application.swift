@@ -144,7 +144,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         if panel.isVisible, !NSApp.isHidden { panel.makeKeyAndOrderFront(nil) }
         panel.makeFirstResponder(session.webView)
         UserDefaults.standard.set(provider.id, forKey: "LastProviderID")
-        if existing == nil { session.loadHome() }
+        if existing == nil { session.loadInitialPage() }
         else if case .failed = session.loadState { session.loadHome() }
     }
 
@@ -155,7 +155,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             guard let self, self.currentSession?.policy.provider.id == provider.id else { return }
             self.panel.updateLoadState(state, providerName: provider.name)
         }
-        session.webDelegate.onCommit = { [weak self] _ in
+        session.onCommit = { [weak self] in
             guard let self, self.currentSession?.policy.provider.id == provider.id else { return }
             self.panel.origin = self.currentSession.title
         }

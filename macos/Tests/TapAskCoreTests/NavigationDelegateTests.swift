@@ -1,4 +1,5 @@
 import AppKit
+import TapAskCore
 import XCTest
 import WebKit
 @testable import TapAsk
@@ -60,7 +61,57 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
     }
 
     @MainActor
-    func testWindowOpenToAllowedHostDoesNotNavigateMainWebView() async throws {
+    func testWindowOpenToProviderHostNavigatesMainWebViewWithoutPopup() async throws {
+        let delegate = WebViewDelegate(policy: try SharedFixtures.chatGPTPolicy())
+        let harness = NavigationHarness()
+        let newWindowRequested = expectation(description: "Real window.open callback reached")
+        let mainNavigation = expectation(description: "Main WebView loads the provider page")
+        let webView = makeWebView(harness, allowsAutomaticWindows: true, productionDelegate: delegate)
+        let destination = URL(string: "https://chatgpt.com/c/fixture-conversation")!
+        var popupCreationCount = 0
+        harness.action = { action, handler in
+            if action.targetFrame == nil {
+                delegate.webView(webView, decidePolicyFor: action) { policy in
+                    XCTAssertEqual(policy, .allow)
+                    handler(policy)
+                }
+            } else if action.targetFrame?.isMainFrame == true, action.request.url == destination {
+                handler(.cancel) // Observe the real load without contacting the provider.
+                mainNavigation.fulfill()
+            } else {
+                allowInMemoryHTMLOrPopup(action, handler: handler)
+            }
+        }
+        harness.response = { response, handler in
+            allowInMemoryHTMLResponse(response, handler: handler)
+        }
+        delegate.onCreatePopup = { _, _ in
+            popupCreationCount += 1
+            XCTFail("Provider pages must remain in the main WebView")
+            return nil
+        }
+        harness.createWebView = { configuration, action, features in
+            assertTrustedPopupSource(action)
+            XCTAssertEqual(action.request.url, destination)
+            XCTAssertNil(action.targetFrame)
+            let created = delegate.webView(webView, createWebViewWith: configuration,
+                                           for: action, windowFeatures: features)
+            XCTAssertNil(created)
+            newWindowRequested.fulfill()
+            return created
+        }
+        defer {
+            stop(webView)
+            delegate.onCreatePopup = nil
+        }
+        loadWindowOpen(to: destination.absoluteString, in: webView)
+        await fulfillment(of: [newWindowRequested, mainNavigation], timeout: 3)
+        XCTAssertEqual(popupCreationCount, 0)
+        withExtendedLifetime(harness) {}
+    }
+
+    @MainActor
+    func testWindowOpenToIdentityHostDoesNotNavigateMainWebView() async throws {
         let delegate = WebViewDelegate(policy: try SharedFixtures.chatGPTPolicy())
         let popupDelegate = WebViewDelegate(policy: try SharedFixtures.chatGPTPolicy(), isPopup: true)
         let harness = NavigationHarness()
@@ -137,6 +188,76 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
         await fulfillment(of: [popupRequested, popupNavigation, mainNavigation], timeout: 3)
         XCTAssertTrue(mainNavigationHosts.isEmpty, "window.open must leave its opener in the main WebView")
         withExtendedLifetime((harness, popupHarness, popupDelegate)) {}
+    }
+
+    @MainActor
+    func testRestoredPageFailureFallsBackOnceBeforeShowingHomeFailure() async throws {
+        _ = NSApplication.shared
+        let catalog = try SharedFixtures.catalog()
+        let provider = try XCTUnwrap(catalog.providers.first { $0.id == "gemini" })
+        let suite = "TapAsk.NavigationDelegateTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let savedPage = "https://gemini.google.com/u/1/app"
+        defaults.set(savedPage, forKey: "LastPage.gemini")
+        let session = ProviderSession(provider: provider, identityHosts: catalog.identityHosts, defaults: defaults)
+        let harness = NavigationHarness()
+        session.webView.navigationDelegate = harness
+        let fallback = expectation(description: "Restored page falls back to home")
+        let unexpectedRetry = expectation(description: "Home failure must not retry automatically")
+        unexpectedRetry.isInverted = true
+        let failure = NSError(domain: NSURLErrorDomain, code: NSURLErrorTimedOut)
+        var requests: [URLRequest] = []
+        var visibleFailures: [PageLoadState] = []
+        session.onLoadStateChange = { state in
+            if case .failed = state { visibleFailures.append(state) }
+        }
+        harness.action = { action, handler in
+            requests.append(action.request)
+            handler(.cancel) // Drive failure callbacks locally, without any network request.
+            guard requests.count <= 2 else {
+                unexpectedRetry.fulfill()
+                return
+            }
+            session.webDelegate.webView(session.webView, didStartProvisionalNavigation: nil)
+            session.webDelegate.webView(session.webView, didFailProvisionalNavigation: nil, withError: failure)
+            if requests.count == 1 {
+                XCTAssertTrue(visibleFailures.isEmpty, "The restored page failure must stay hidden")
+            } else {
+                fallback.fulfill()
+            }
+        }
+        defer { stop(session.webView) }
+        session.loadInitialPage()
+        await fulfillment(of: [fallback, unexpectedRetry], timeout: 3)
+        XCTAssertEqual(requests.compactMap(\.url), [URL(string: savedPage)!, provider.home])
+        XCTAssertTrue(requests.allSatisfy { $0.timeoutInterval == 20 })
+        let failed = PageLoadState.failed(PageLoadFailure(domain: failure.domain, code: failure.code))
+        XCTAssertEqual(visibleFailures, [failed])
+        XCTAssertEqual(session.loadState, failed)
+        withExtendedLifetime(harness) {}
+    }
+
+    @MainActor
+    func testSessionCommitSavesItsPageBeforeNotifyingTheApplication() throws {
+        _ = NSApplication.shared
+        let catalog = try SharedFixtures.catalog()
+        let provider = try XCTUnwrap(catalog.providers.first { $0.id == "gemini" })
+        let suite = "TapAsk.NavigationDelegateTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let session = ProviderSession(provider: provider, identityHosts: catalog.identityHosts, defaults: defaults)
+        let savedPage = "https://gemini.google.com/u/1/app"
+        var commitCount = 0
+        session.onCommit = {
+            XCTAssertEqual(defaults.string(forKey: "LastPage.gemini"), savedPage)
+            commitCount += 1
+        }
+        session.webDelegate.onCommit?(URL(string: savedPage + "?hl=zh#message"))
+        session.webDelegate.onCommit?(URL(string: "https://accounts.google.com/login"))
+        XCTAssertEqual(commitCount, 2)
+        XCTAssertNil(defaults.string(forKey: "LastPage.chatgpt"))
+        stop(session.webView)
     }
 
     @MainActor

@@ -51,7 +51,7 @@ final class WebViewDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
                 decisionHandler(.cancel)
                 webView.load(navigationAction.request)
             } else {
-                // Main-window popups must reach createWebViewWith without replacing their opener.
+                // Route main-window requests in createWebViewWith, preserving login openers.
                 decisionHandler(.allow)
             }
         case .browser:
@@ -128,11 +128,14 @@ final class WebViewDelegate: NSObject, WKNavigationDelegate, WKUIDelegate {
                  for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures) -> WKWebView? {
         // Apply the same clicked-GET/source rules even if WebKit reaches this callback directly.
         let result = decision(for: navigationAction)
-        log(navigationAction.request.url, phase: "new-window", result: result)
+        let opensInMainView = !isPopup && result == .allow && policy.isProviderURL(navigationAction.request.url)
+        log(navigationAction.request.url, phase: opensInMainView ? "new-window-inline" : "new-window", result: result)
         switch result {
         case .allow:
             if isPopup {
                 // Nested popups reuse the existing login window; never create a third window.
+                webView.load(navigationAction.request)
+            } else if opensInMainView {
                 webView.load(navigationAction.request)
             } else {
                 // WebKit loads the returned view and preserves its relationship with window.opener.
