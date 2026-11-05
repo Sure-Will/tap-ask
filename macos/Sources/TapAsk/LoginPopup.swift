@@ -78,19 +78,11 @@ final class LoginPanel: NSPanel, NSWindowDelegate {
     override var canBecomeMain: Bool { true }
 
     func windowDidBecomeKey(_ notification: Notification) { onBecomeKey?() }
-    override func cancelOperation(_ sender: Any?) { onCancel?() }
+    /// The close button or the page's window.close() ends the popup; Esc does not.
+    override func cancelOperation(_ sender: Any?) {}
 
     override func close() {
         if let onCancel { onCancel() }
         else { super.close() } // Disposal clears the callback before closing the actual window.
-    }
-
-    override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
-           event.charactersIgnoringModifiers == "w" {
-            close()
-            return true
-        }
-        return super.performKeyEquivalent(with: event)
     }
 }

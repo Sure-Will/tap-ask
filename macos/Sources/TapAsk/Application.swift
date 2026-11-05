@@ -72,7 +72,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             AppLog.hotkey.error("Hotkey registration failed: \(String(describing: error), privacy: .public)")
             NSApp.activate()
             let alert = NSAlert()
-            alert.messageText = "⌥空格 已被其他 app 占用（多半是 ChatGPT 的「显示 Mini」）。请在那个 app 里改掉它的快捷键，然后重新打开 TapAsk。"
+            alert.messageText = "⌥空格 注册失败"
+            alert.informativeText = "请重新打开 TapAsk 后再试，当前仍可使用窗口。"
             alert.addButton(withTitle: "好")
             alert.runModal()
         }
@@ -97,19 +98,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         loginPopup?.dispose()
     }
 
-    private var isChatWindowKey: Bool {
-        panel.isKeyWindow || loginPopup?.panel.isKeyWindow == true
-    }
-
     private func togglePanel() {
         let startedAt = DispatchTime.now().uptimeNanoseconds
-        switch PanelToggle.action(isVisible: panel.isVisible,
-                                  isKeyAndActive: isChatWindowKey && NSApp.isActive) {
-        case .show, .focus:
+        switch PanelToggle.action(isVisible: panel.isVisible) {
+        case .show:
             hotKeyStartedAt = startedAt
             presentPanel()
-            // A visible panel can remain key while its application is inactive.
-            if isChatWindowKey { recordKeyLatency() }
         case .hide:
             hidePanel()
             AppLog.hotkey.info("action=hide")

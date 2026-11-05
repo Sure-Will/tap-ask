@@ -60,15 +60,7 @@ final class ChatPanel: NSPanel, NSWindowDelegate {
     func windowDidResize(_ notification: Notification) { saveFrame() }
     func windowDidBecomeKey(_ notification: Notification) { onBecomeKey?() }
 
-    override func cancelOperation(_ sender: Any?) { onCancel?() }
+    /// Only ⌥Space hides the panel; an Esc the page leaves unhandled is ignored.
+    override func cancelOperation(_ sender: Any?) {}
     override func close() { onCancel?() }
-
-    override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
-           event.charactersIgnoringModifiers == "w" {
-            onCancel?()
-            return true
-        }
-        return super.performKeyEquivalent(with: event)
-    }
 }

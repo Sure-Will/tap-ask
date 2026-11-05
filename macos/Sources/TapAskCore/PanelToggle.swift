@@ -1,8 +1,9 @@
 public enum PanelToggle {
-    public enum Decision: Equatable, Sendable { case show, hide, focus }
+    public enum Decision: Equatable, Sendable { case show, hide }
 
-    public static func action(isVisible: Bool, isKeyAndActive: Bool) -> Decision {
-        if !isVisible { return .show }
-        return isKeyAndActive ? .hide : .focus
+    /// The panel floats above every app, so a visible panel is hidden even when
+    /// another app has keyboard focus: one press always toggles what the user sees.
+    public static func action(isVisible: Bool) -> Decision {
+        isVisible ? .hide : .show
     }
 }

@@ -2,19 +2,12 @@ import XCTest
 import TapAskCore
 
 final class PanelToggleTests: XCTestCase {
-    func testHiddenPanelIsShownWhenInactive() {
-        XCTAssertEqual(PanelToggle.action(isVisible: false, isKeyAndActive: false), .show)
+    func testHiddenPanelIsShown() {
+        XCTAssertEqual(PanelToggle.action(isVisible: false), .show)
     }
 
-    func testHiddenPanelIsShownEvenWithStaleActiveFlag() {
-        XCTAssertEqual(PanelToggle.action(isVisible: false, isKeyAndActive: true), .show)
-    }
-
-    func testVisibleInactivePanelIsFocused() {
-        XCTAssertEqual(PanelToggle.action(isVisible: true, isKeyAndActive: false), .focus)
-    }
-
-    func testVisibleActivePanelIsHidden() {
-        XCTAssertEqual(PanelToggle.action(isVisible: true, isKeyAndActive: true), .hide)
+    /// Visible but unfocused (another app is key) must hide on the first press.
+    func testVisiblePanelIsHiddenOnFirstPress() {
+        XCTAssertEqual(PanelToggle.action(isVisible: true), .hide)
     }
 }

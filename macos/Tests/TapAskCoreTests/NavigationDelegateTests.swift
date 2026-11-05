@@ -26,17 +26,29 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
 
     @MainActor
     func testFinalExternalResponseIsCancelledByRealDelegate() async throws {
-        let delegate = WebViewDelegate(policy: try SharedFixtures.chatGPTPolicy())
+        let policy = try SharedFixtures.chatGPTPolicy()
+        let delegate = WebViewDelegate(policy: policy)
         let harness = NavigationHarness()
         let finished = expectation(description: "WebKit final response cancelled")
         let webView = makeWebView(harness)
-        // A custom scheme supplies a real response without a network server.
-        // Only this harness bypasses the initial action.
-        harness.action = { _, handler in handler(.allow) }
+        // The custom scheme supplies local bytes with an HTTPS response URL, so
+        // cancellation must come from main-frame host trust, not the scheme check.
+        // Bypass only the fixture action; any unexpected navigation stays offline.
+        harness.action = { action, handler in
+            XCTAssertEqual(action.request.url?.scheme, "fixture")
+            handler(action.request.url?.scheme == "fixture" ? .allow : .cancel)
+        }
         harness.response = { response, handler in
+            XCTAssertEqual(response.response.url?.scheme, "https")
             XCTAssertEqual(response.response.url?.host, "example.invalid")
-            delegate.webView(webView, decidePolicyFor: response) { policy in
-                XCTAssertEqual(policy, .cancel)
+            XCTAssertFalse(policy.isPanelURL(response.response.url))
+            XCTAssertTrue(response.isForMainFrame)
+            XCTAssertTrue(response.canShowMIMEType)
+            XCTAssertNil((response.response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Content-Disposition"))
+            XCTAssertEqual(policy.response(url: response.response.url, mainFrame: false,
+                                           canDisplay: true, attachment: false), .allow)
+            delegate.webView(webView, decidePolicyFor: response) { result in
+                XCTAssertEqual(result, .cancel)
                 handler(.cancel)
                 finished.fulfill()
             }
@@ -239,7 +251,7 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .nonPersistent()
         config.preferences.javaScriptCanOpenWindowsAutomatically = allowsAutomaticWindows
-        config.setURLSchemeHandler(StaticPageFixture(), forURLScheme: "fixture")
+        config.setURLSchemeHandler(ExternalHTTPSResponseFixture(), forURLScheme: "fixture")
         let webView = productionDelegate?.makeWebView(configuration: config)
             ?? WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = delegate
@@ -313,10 +325,10 @@ private final class NavigationHarness: NSObject, WKNavigationDelegate, WKUIDeleg
 }
 
 @MainActor
-private final class StaticPageFixture: NSObject, WKURLSchemeHandler {
+private final class ExternalHTTPSResponseFixture: NSObject, WKURLSchemeHandler {
     func webView(_ webView: WKWebView, start urlSchemeTask: WKURLSchemeTask) {
         let data = Data("<html><body>Untrusted fixture</body></html>".utf8)
-        urlSchemeTask.didReceive(URLResponse(url: urlSchemeTask.request.url!, mimeType: "text/html",
+        urlSchemeTask.didReceive(URLResponse(url: URL(string: "https://example.invalid/login")!, mimeType: "text/html",
                                             expectedContentLength: data.count, textEncodingName: "utf-8"))
         urlSchemeTask.didReceive(data)
         urlSchemeTask.didFinish()
