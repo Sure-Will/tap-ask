@@ -14,12 +14,13 @@ final class ProviderSession {
     var onLoadStateChange: ((PageLoadState) -> Void)?
     var onCommit: (() -> Void)?
 
-    init(provider: Provider, identityHosts: [String], defaults: UserDefaults = .standard) {
+    init(provider: Provider, identityHosts: [String], defaults: UserDefaults = .standard,
+         websiteDataStore: WKWebsiteDataStore = .default()) {
         self.defaults = defaults
         policy = NavigationPolicy(provider: provider, identityHosts: identityHosts)
         webDelegate = WebViewDelegate(policy: policy)
         let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = .default()
+        configuration.websiteDataStore = websiteDataStore
         webView = webDelegate.makeWebView(configuration: configuration)
         webDelegate.onLoadStateChange = { [weak self] state in
             guard let self else { return }

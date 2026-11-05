@@ -59,6 +59,8 @@ DeepSeek 的首页、`/sign_in` 及共享登录主机可在窗口内打开；脚
 
 ## 手动验收清单
 
+调试内存时用 `macos/scripts/build-debug-app.sh` 生成独立标识的 `TapAsk-Debug.app`（显示名 TapAsk Debug，偏好与网站数据独立、不注册登录项、快捷键失败只记日志），启动参数 `-TapAskSoak <轮数> [-TapAskSoakDwell <秒数>]` 会按默认每家 8 秒循环切换、轮间开关排序窗口并记录会话数，完成后退出；运行中可用 `macos/scripts/measure-memory.sh TapAsk-Debug [标签]` 采样并追加到 `macos/build/memory.csv`，压测入口只编译进 DEBUG。
+
 以下项目需要用户实际运行产物；编译与自动化测试通过不表示已经完成这些验收。
 
 - [ ] 从别的 app 按 ⌥空格，窗口出现，可以直接打字，第一个字不丢。

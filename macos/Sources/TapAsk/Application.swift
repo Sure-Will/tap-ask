@@ -24,7 +24,7 @@ enum TapAskApplication {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
-    private var panel: ChatPanel!
+    private(set) var panel: ChatPanel!
     private var catalog: ProviderCatalog!
     private var orderedProviders: [Provider] = []
     private var providerOrderWindow: ProviderOrderWindowController?
@@ -32,11 +32,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var statusMenu: NSMenu?
     private var sessions: [String: ProviderSession] = [:]
     private var currentSession: ProviderSession!
-    private var loginPopup: LoginPopup?
+    private(set) var loginPopup: LoginPopup?
     private var hotKey: HotKey?
     private var statusItem: NSStatusItem?
     private var hotKeyStartedAt: UInt64?
     private var needsWebFocus = false
+    #if DEBUG
+    private var soakTask: Task<Void, Never>?
+    #endif
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let launchEvent = NSAppleEventManager.shared().currentAppleEvent
@@ -51,32 +54,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                                                         savedID: UserDefaults.standard.string(forKey: "LastProviderID")) else {
             fatalError("TapAsk: providers.json 必须至少包含一个服务商。")
         }
-        panel = ChatPanel()
-        panel.onCancel = { [weak self] in self?.hidePanel() }
-        panel.onRetry = { [weak self] in self?.currentSession.loadHome() }
-        panel.onBecomeKey = { [weak self] in
-            if self?.loginPopup == nil { self?.recordKeyLatency() }
-        }
+        configurePanel()
 
         switchProvider(to: provider)
         installMainMenu()
         installStatusItem()
 
+        #if !DEBUG
         registerLoginItemOnce()
+        #endif
         var hotKeyUnavailable = false
         do {
             hotKey = try HotKey { [weak self] in self?.togglePanel() }
         } catch {
             hotKeyUnavailable = true
             AppLog.hotkey.error("Hotkey registration failed: \(String(describing: error), privacy: .public)")
+            #if !DEBUG
             NSApp.activate()
             let alert = NSAlert()
             alert.messageText = "⌥空格 注册失败"
             alert.informativeText = "请重新打开 TapAsk 后再试，当前仍可使用窗口。"
             alert.addButton(withTitle: "好")
             alert.runModal()
+            #endif
         }
         if !launchedAtLogin || hotKeyUnavailable { presentPanel() }
+        #if DEBUG
+        startSoakIfRequested()
+        #endif
+    }
+
+    func configurePanel(defaults: UserDefaults = .standard) {
+        panel = ChatPanel(defaults: defaults)
+        panel.onCancel = { [weak self] in self?.hidePanel() }
+        panel.onRetry = { [weak self] in self?.currentSession.loadHome() }
+        panel.onBecomeKey = { [weak self] in
+            if self?.loginPopup == nil { self?.recordKeyLatency() }
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -93,8 +107,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        #if DEBUG
+        soakTask?.cancel()
+        soakTask = nil
+        #endif
         hotKey?.unregister()
-        loginPopup?.dispose()
+        closeLoginPopup(restoreFocus: false)
+        removeAllSessions()
     }
 
     private func togglePanel() {
@@ -136,16 +155,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         closeLoginPopup(restoreFocus: false)
         let existing = sessions[provider.id]
         let session = existing ?? makeSession(for: provider)
-        sessions[provider.id] = session
-        currentSession = session
-        panel.contentView = session.webView
-        panel.origin = session.title
-        panel.updateLoadState(session.loadState, providerName: provider.name)
-        if panel.isVisible, !NSApp.isHidden { panel.makeKeyAndOrderFront(nil) }
-        panel.makeFirstResponder(session.webView)
+        displaySession(session)
         UserDefaults.standard.set(provider.id, forKey: "LastProviderID")
         if existing == nil { session.loadInitialPage() }
         else if case .failed = session.loadState { session.loadHome() }
+    }
+
+    /// Shared assembly path; loading is separate so local lifecycle fixtures need no network.
+    func displaySession(_ session: ProviderSession) {
+        sessions[session.policy.provider.id] = session
+        currentSession = session
+        panel.contentView = session.webView
+        panel.origin = session.title
+        panel.updateLoadState(session.loadState, providerName: session.policy.provider.name)
+        if panel.isVisible, !NSApp.isHidden { panel.makeKeyAndOrderFront(nil) }
+        panel.makeFirstResponder(session.webView)
+    }
+
+    /// Termination releases both the visible page and the cached background pages.
+    func removeAllSessions() {
+        for session in sessions.values { session.webView.stopLoading() }
+        panel?.makeFirstResponder(nil)
+        panel?.contentView = nil
+        currentSession = nil
+        sessions.removeAll()
     }
 
     private func makeSession(for provider: Provider) -> ProviderSession {
@@ -167,8 +200,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return session
     }
 
-    private func openLoginPopup(configuration: WKWebViewConfiguration, policy: NavigationPolicy,
-                                initialURL: URL?) -> WKWebView {
+    func openLoginPopup(configuration: WKWebViewConfiguration, policy: NavigationPolicy,
+                        initialURL: URL?) -> WKWebView {
         closeLoginPopup(restoreFocus: false)
         let popup = LoginPopup(configuration: configuration, policy: policy, initialURL: initialURL)
         loginPopup = popup
@@ -184,11 +217,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return popup.webView
     }
 
-    private func closeLoginPopup(restoreFocus: Bool = true) {
+    func closeLoginPopup(restoreFocus: Bool = true) {
         let popup = loginPopup
         loginPopup = nil
         popup?.dispose()
-        if restoreFocus, panel.isVisible, !NSApp.isHidden {
+        if restoreFocus, panel?.isVisible == true, !NSApp.isHidden {
             needsWebFocus = true
             NSApp.activate()
             focusChatWindow()
@@ -302,6 +335,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
     }
 
+    #if !DEBUG
     private func registerLoginItemOnce() {
         let key = "LoginItemRegistrationAttempted"
         let defaults = UserDefaults.standard
@@ -322,6 +356,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             AppLog.lifecycle.error("Login item registration failed: \(error.localizedDescription, privacy: .public)")
         }
     }
+    #endif
+
+    #if DEBUG
+    private func startSoakIfRequested() {
+        let options: DebugSoakOptions
+        do {
+            guard let parsed = try DebugSoakOptions(arguments: CommandLine.arguments) else { return }
+            options = parsed
+        } catch {
+            AppLog.lifecycle.error("phase=soak error=\(error.localizedDescription, privacy: .public)")
+            NSApp.terminate(nil)
+            return
+        }
+        let providers = orderedProviders
+        soakTask = Task { @MainActor [weak self] in
+            for round in 1...options.rounds {
+                for provider in providers {
+                    guard !Task.isCancelled, self != nil else { return }
+                    self?.switchProvider(to: provider)
+                    do { try await Task.sleep(for: .seconds(options.dwell)) }
+                    catch { return }
+                }
+                guard let self else { return }
+                AppLog.lifecycle.notice("phase=soak round=\(round, privacy: .public) sessions=\(self.sessions.count, privacy: .public)")
+                if round < options.rounds {
+                    self.showProviderOrder(nil)
+                    // Give AppKit a turn to present and lay out the window before closing it.
+                    do { try await Task.sleep(for: .milliseconds(100)) }
+                    catch { return }
+                    self.providerOrderWindow?.window?.performClose(nil)
+                }
+            }
+            AppLog.lifecycle.notice("phase=soak done")
+            self?.soakTask = nil
+            NSApp.terminate(nil)
+        }
+    }
+    #endif
 
     private func installMainMenu() {
         let main = NSMenu()
