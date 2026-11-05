@@ -1,0 +1,8 @@
+{
+  "identityHosts": ["accounts.google.com", "accounts.youtube.com", "appleid.apple.com", "account.apple.com",
+                    "login.microsoftonline.com", "login.microsoft.com", "login.live.com", "account.live.com"],
+  "providers": [
+    { "id": "chatgpt", "name": "ChatGPT", "home": "https://chatgpt.com/",
+      "hosts": ["chatgpt.com", "chat.openai.com", "auth.openai.com", "auth0.openai.com", "setup.auth.openai.com"] }
+  ]
+}

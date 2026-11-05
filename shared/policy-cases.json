@@ -1,0 +1,745 @@
+{
+  "isPanelURL": [
+    {
+      "id": "trusted-chatgpt.com",
+      "group": "testChatAndSpecificLoginEndpoints",
+      "url": "https://chatgpt.com/login",
+      "expected": true
+    },
+    {
+      "id": "trusted-auth.openai.com",
+      "group": "testChatAndSpecificLoginEndpoints",
+      "url": "https://auth.openai.com/login",
+      "expected": true
+    },
+    {
+      "id": "trusted-auth0.openai.com",
+      "group": "testChatAndSpecificLoginEndpoints",
+      "url": "https://auth0.openai.com/login",
+      "expected": true
+    },
+    {
+      "id": "trusted-setup.auth.openai.com",
+      "group": "testChatAndSpecificLoginEndpoints",
+      "url": "https://setup.auth.openai.com/login",
+      "expected": true
+    },
+    {
+      "id": "trusted-accounts.google.com",
+      "group": "testChatAndSpecificLoginEndpoints",
+      "url": "https://accounts.google.com/login",
+      "expected": true
+    },
+    {
+      "id": "trusted-appleid.apple.com",
+      "group": "testChatAndSpecificLoginEndpoints",
+      "url": "https://appleid.apple.com/login",
+      "expected": true
+    },
+    {
+      "id": "trusted-login.microsoftonline.com",
+      "group": "testChatAndSpecificLoginEndpoints",
+      "url": "https://login.microsoftonline.com/login",
+      "expected": true
+    },
+    {
+      "id": "trusted-login.live.com",
+      "group": "testChatAndSpecificLoginEndpoints",
+      "url": "https://login.live.com/login",
+      "expected": true
+    },
+    {
+      "id": "uppercase-default-port",
+      "group": "testChatAndSpecificLoginEndpoints",
+      "url": "https://CHATGPT.COM:443/",
+      "expected": true
+    },
+    {
+      "id": "google-bridge-trusted",
+      "group": "testGoogleAccountCrossDomainSignInRemainsInsidePanel",
+      "url": "https://accounts.youtube.com/accounts/SetSID?fixture=1",
+      "expected": true
+    },
+    {
+      "id": "google-bridge-lookalike-1",
+      "group": "testGoogleAccountCrossDomainSignInRemainsInsidePanel",
+      "url": "https://youtube.com",
+      "expected": false
+    },
+    {
+      "id": "google-bridge-lookalike-2",
+      "group": "testGoogleAccountCrossDomainSignInRemainsInsidePanel",
+      "url": "https://www.youtube.com",
+      "expected": false
+    },
+    {
+      "id": "google-bridge-lookalike-3",
+      "group": "testGoogleAccountCrossDomainSignInRemainsInsidePanel",
+      "url": "https://evil.accounts.youtube.com",
+      "expected": false
+    },
+    {
+      "id": "google-bridge-lookalike-4",
+      "group": "testGoogleAccountCrossDomainSignInRemainsInsidePanel",
+      "url": "https://accounts.youtube.com.evil.example",
+      "expected": false
+    },
+    {
+      "id": "google-bridge-lookalike-5",
+      "group": "testGoogleAccountCrossDomainSignInRemainsInsidePanel",
+      "url": "http://accounts.youtube.com",
+      "expected": false
+    },
+    {
+      "id": "untrusted-1",
+      "group": "testUntrustedOriginsCannotRenderInPanel",
+      "url": "https://chatgpt.com.evil.example",
+      "expected": false
+    },
+    {
+      "id": "untrusted-2",
+      "group": "testUntrustedOriginsCannotRenderInPanel",
+      "url": "https://notchatgpt.com",
+      "expected": false
+    },
+    {
+      "id": "untrusted-3",
+      "group": "testUntrustedOriginsCannotRenderInPanel",
+      "url": "https://google.com",
+      "expected": false
+    },
+    {
+      "id": "untrusted-4",
+      "group": "testUntrustedOriginsCannotRenderInPanel",
+      "url": "https://sites.google.com",
+      "expected": false
+    },
+    {
+      "id": "untrusted-5",
+      "group": "testUntrustedOriginsCannotRenderInPanel",
+      "url": "https://evil.auth0.com",
+      "expected": false
+    },
+    {
+      "id": "untrusted-6",
+      "group": "testUntrustedOriginsCannotRenderInPanel",
+      "url": "https://anything.apple.com",
+      "expected": false
+    },
+    {
+      "id": "untrusted-7",
+      "group": "testUntrustedOriginsCannotRenderInPanel",
+      "url": "http://chatgpt.com",
+      "expected": false
+    },
+    {
+      "id": "untrusted-8",
+      "group": "testUntrustedOriginsCannotRenderInPanel",
+      "url": "https://chatgpt.com:8443",
+      "expected": false
+    },
+    {
+      "id": "untrusted-9",
+      "group": "testUntrustedOriginsCannotRenderInPanel",
+      "url": "https://user@chatgpt.com",
+      "expected": false
+    },
+    {
+      "id": "untrusted-10",
+      "group": "testUntrustedOriginsCannotRenderInPanel",
+      "url": "https://chatgpt.com@evil.example",
+      "expected": false
+    },
+    {
+      "id": "untrusted-11",
+      "group": "testUntrustedOriginsCannotRenderInPanel",
+      "url": "file:///tmp/login.html",
+      "expected": false
+    },
+    {
+      "id": "untrusted-12",
+      "group": "testUntrustedOriginsCannotRenderInPanel",
+      "url": "about:blank",
+      "expected": false
+    },
+    {
+      "id": "untrusted-13",
+      "group": "testUntrustedOriginsCannotRenderInPanel",
+      "url": "javascript:alert(1)",
+      "expected": false
+    },
+    {
+      "id": "untrusted-14",
+      "group": "testUntrustedOriginsCannotRenderInPanel",
+      "url": "quickchat://anything",
+      "expected": false
+    },
+    {
+      "id": "untrusted-15",
+      "group": "testUntrustedOriginsCannotRenderInPanel",
+      "url": "https://chаtgpt.com",
+      "expected": false
+    },
+    {
+      "id": "missing-url",
+      "group": "testUntrustedOriginsCannotRenderInPanel",
+      "url": null,
+      "expected": false
+    },
+    {
+      "id": "remaining-trusted-chat.openai.com",
+      "group": "additionalPolicyBranches",
+      "url": "https://chat.openai.com/",
+      "expected": true
+    },
+    {
+      "id": "remaining-trusted-account.apple.com",
+      "group": "additionalPolicyBranches",
+      "url": "https://account.apple.com/",
+      "expected": true
+    },
+    {
+      "id": "remaining-trusted-login.microsoft.com",
+      "group": "additionalPolicyBranches",
+      "url": "https://login.microsoft.com/",
+      "expected": true
+    },
+    {
+      "id": "remaining-trusted-account.live.com",
+      "group": "additionalPolicyBranches",
+      "url": "https://account.live.com/",
+      "expected": true
+    },
+    {
+      "id": "password-rejected",
+      "group": "additionalPolicyBranches",
+      "url": "https://user:pass@chatgpt.com/",
+      "expected": false
+    }
+  ],
+  "actions": [
+    {
+      "id": "google-bridge-action",
+      "group": "testGoogleAccountCrossDomainSignInRemainsInsidePanel",
+      "url": "https://accounts.youtube.com/accounts/SetSID?fixture=1",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://accounts.google.com/",
+      "expected": "allow"
+    },
+    {
+      "id": "external-click",
+      "group": "testExternalClickScriptAndFormAreDifferent",
+      "url": "https://example.com",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/c/example",
+      "expected": "browser"
+    },
+    {
+      "id": "external-programmatic",
+      "group": "testExternalClickScriptAndFormAreDifferent",
+      "url": "https://example.com",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/c/example",
+      "expected": "cancel"
+    },
+    {
+      "id": "external-post",
+      "group": "testExternalClickScriptAndFormAreDifferent",
+      "url": "https://example.com",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "POST",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/c/example",
+      "expected": "cancel"
+    },
+    {
+      "id": "mail-click",
+      "group": "testExternalClickScriptAndFormAreDifferent",
+      "url": "mailto:someone@example.com",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/c/example",
+      "expected": "cancel"
+    },
+    {
+      "id": "file-click",
+      "group": "testExternalClickScriptAndFormAreDifferent",
+      "url": "file:///tmp/file",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/c/example",
+      "expected": "cancel"
+    },
+    {
+      "id": "trusted-post",
+      "group": "testExternalClickScriptAndFormAreDifferent",
+      "url": "https://auth.openai.com/login",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "POST",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/c/example",
+      "expected": "allow"
+    },
+    {
+      "id": "client-navigation",
+      "group": "testExternalClickScriptAndFormAreDifferent",
+      "url": "https://chatgpt.com/c/example",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/c/example",
+      "expected": "allow"
+    },
+    {
+      "id": "generated-file-1",
+      "group": "testDownloadsNeverBecomePanelDocuments",
+      "url": "blob:https://chatgpt.com/uuid",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/c/example",
+      "expected": "download"
+    },
+    {
+      "id": "generated-file-2",
+      "group": "testDownloadsNeverBecomePanelDocuments",
+      "url": "data:text/plain,hello",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/c/example",
+      "expected": "download"
+    },
+    {
+      "id": "explicit-download",
+      "group": "testDownloadsNeverBecomePanelDocuments",
+      "url": "https://files.oaiusercontent.com/export",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": true,
+      "sourceURL": "https://chatgpt.com/c/example",
+      "expected": "download"
+    },
+    {
+      "id": "file-download-rejected",
+      "group": "testDownloadsNeverBecomePanelDocuments",
+      "url": "file:///etc/passwd",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": true,
+      "sourceURL": "https://chatgpt.com/c/example",
+      "expected": "cancel"
+    },
+    {
+      "id": "untrusted-source-generated",
+      "group": "testDownloadsNeverBecomePanelDocuments",
+      "url": "data:text/html,login",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://evil.example",
+      "expected": "cancel"
+    },
+    {
+      "id": "captcha-subframe",
+      "group": "testCaptchaSubframesAreSeparateFromTopLevelTrust",
+      "url": "https://challenges.cloudflare.com/widget",
+      "topLevel": false,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/c/example",
+      "expected": "allow"
+    },
+    {
+      "id": "captcha-top-level",
+      "group": "testCaptchaSubframesAreSeparateFromTopLevelTrust",
+      "url": "https://challenges.cloudflare.com/widget",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/c/example",
+      "expected": "cancel"
+    },
+    {
+      "id": "missing-target",
+      "group": "additionalPolicyBranches",
+      "url": null,
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/c/example",
+      "expected": "cancel"
+    },
+    {
+      "id": "external-click-no-source",
+      "group": "additionalPolicyBranches",
+      "url": "https://example.com",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": null,
+      "expected": "cancel"
+    },
+    {
+      "id": "external-click-untrusted-source",
+      "group": "additionalPolicyBranches",
+      "url": "https://example.com",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://evil.example",
+      "expected": "cancel"
+    },
+    {
+      "id": "external-click-default-method",
+      "group": "additionalPolicyBranches",
+      "url": "https://example.com",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": null,
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/c/example",
+      "expected": "browser"
+    },
+    {
+      "id": "external-click-case-insensitive-method",
+      "group": "additionalPolicyBranches",
+      "url": "https://example.com",
+      "topLevel": true,
+      "clickedLink": true,
+      "method": "get",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/c/example",
+      "expected": "browser"
+    },
+    {
+      "id": "download-no-source",
+      "group": "additionalPolicyBranches",
+      "url": "https://files.oaiusercontent.com/export",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": true,
+      "sourceURL": null,
+      "expected": "cancel"
+    },
+    {
+      "id": "download-invalid-https-port",
+      "group": "additionalPolicyBranches",
+      "url": "https://files.oaiusercontent.com:8443/export",
+      "topLevel": true,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": true,
+      "sourceURL": "https://chatgpt.com/c/example",
+      "expected": "cancel"
+    },
+    {
+      "id": "subframe-blank",
+      "group": "additionalPolicyBranches",
+      "url": "about:blank",
+      "topLevel": false,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/c/example",
+      "expected": "allow"
+    },
+    {
+      "id": "subframe-srcdoc",
+      "group": "additionalPolicyBranches",
+      "url": "about:srcdoc",
+      "topLevel": false,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/c/example",
+      "expected": "allow"
+    },
+    {
+      "id": "subframe-file",
+      "group": "additionalPolicyBranches",
+      "url": "file:///tmp/frame",
+      "topLevel": false,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/c/example",
+      "expected": "cancel"
+    },
+    {
+      "id": "subframe-data",
+      "group": "additionalPolicyBranches",
+      "url": "data:text/html,frame",
+      "topLevel": false,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/c/example",
+      "expected": "cancel"
+    },
+    {
+      "id": "subframe-missing",
+      "group": "additionalPolicyBranches",
+      "url": null,
+      "topLevel": false,
+      "clickedLink": false,
+      "method": "GET",
+      "wantsDownload": false,
+      "sourceURL": "https://chatgpt.com/c/example",
+      "expected": "cancel"
+    }
+  ],
+  "responses": [
+    {
+      "id": "google-bridge-response",
+      "group": "testGoogleAccountCrossDomainSignInRemainsInsidePanel",
+      "url": "https://accounts.youtube.com/accounts/SetSID?fixture=1",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
+    },
+    {
+      "id": "final-response-1",
+      "group": "testFinalRedirectResponseCannotBypassActionCheck",
+      "url": "https://chatgpt.com",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
+    },
+    {
+      "id": "final-response-2",
+      "group": "testFinalRedirectResponseCannotBypassActionCheck",
+      "url": "https://auth.openai.com/login",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
+    },
+    {
+      "id": "final-response-3",
+      "group": "testFinalRedirectResponseCannotBypassActionCheck",
+      "url": "https://evil.example/login",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "final-response-4",
+      "group": "testFinalRedirectResponseCannotBypassActionCheck",
+      "url": "http://chatgpt.com",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "final-response-5",
+      "group": "testFinalRedirectResponseCannotBypassActionCheck",
+      "url": "data:text/html,login",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "attachment-response",
+      "group": "testDownloadsNeverBecomePanelDocuments",
+      "url": "https://files.oaiusercontent.com/export",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": true,
+      "expected": "download"
+    },
+    {
+      "id": "subframe-blank",
+      "group": "additionalPolicyBranches",
+      "url": "about:blank",
+      "mainFrame": false,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
+    },
+    {
+      "id": "subframe-srcdoc",
+      "group": "additionalPolicyBranches",
+      "url": "about:srcdoc",
+      "mainFrame": false,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
+    },
+    {
+      "id": "subframe-file",
+      "group": "additionalPolicyBranches",
+      "url": "file:///tmp/frame",
+      "mainFrame": false,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "subframe-data",
+      "group": "additionalPolicyBranches",
+      "url": "data:text/html,frame",
+      "mainFrame": false,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "subframe-missing",
+      "group": "additionalPolicyBranches",
+      "url": null,
+      "mainFrame": false,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "subframe-https",
+      "group": "additionalPolicyBranches",
+      "url": "https://challenges.cloudflare.com/widget",
+      "mainFrame": false,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "allow"
+    },
+    {
+      "id": "undisplayable-https",
+      "group": "additionalPolicyBranches",
+      "url": "https://files.oaiusercontent.com/export",
+      "mainFrame": true,
+      "canDisplay": false,
+      "attachment": false,
+      "expected": "download"
+    },
+    {
+      "id": "undisplayable-blob",
+      "group": "additionalPolicyBranches",
+      "url": "blob:https://chatgpt.com/uuid",
+      "mainFrame": true,
+      "canDisplay": false,
+      "attachment": false,
+      "expected": "download"
+    },
+    {
+      "id": "undisplayable-data",
+      "group": "additionalPolicyBranches",
+      "url": "data:text/plain,hello",
+      "mainFrame": true,
+      "canDisplay": false,
+      "attachment": false,
+      "expected": "download"
+    },
+    {
+      "id": "undisplayable-file",
+      "group": "additionalPolicyBranches",
+      "url": "file:///tmp/file",
+      "mainFrame": true,
+      "canDisplay": false,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "undisplayable-missing",
+      "group": "additionalPolicyBranches",
+      "url": null,
+      "mainFrame": true,
+      "canDisplay": false,
+      "attachment": false,
+      "expected": "cancel"
+    },
+    {
+      "id": "attachment-file-rejected",
+      "group": "additionalPolicyBranches",
+      "url": "file:///tmp/file",
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": true,
+      "expected": "cancel"
+    },
+    {
+      "id": "missing-main-response",
+      "group": "additionalPolicyBranches",
+      "url": null,
+      "mainFrame": true,
+      "canDisplay": true,
+      "attachment": false,
+      "expected": "cancel"
+    }
+  ],
+  "origins": [
+    {
+      "id": "google-bridge-origin",
+      "group": "testGoogleAccountCrossDomainSignInRemainsInsidePanel",
+      "url": "https://accounts.youtube.com/accounts/SetSID?fixture=1",
+      "expected": "https://accounts.youtube.com"
+    },
+    {
+      "id": "redact-login-query",
+      "group": "testOriginDisplayOmitsCredentialsPathsAndLoginTokens",
+      "url": "https://auth.openai.com/callback?code=secret#token",
+      "expected": "https://auth.openai.com"
+    },
+    {
+      "id": "redact-credentials",
+      "group": "testOriginDisplayOmitsCredentialsPathsAndLoginTokens",
+      "url": "https://user:pass@evil.example:8443/login",
+      "expected": "https://evil.example:8443"
+    },
+    {
+      "id": "punycode-origin",
+      "group": "testOriginDisplayOmitsCredentialsPathsAndLoginTokens",
+      "url": "https://chаtgpt.com",
+      "excludes": "а"
+    },
+    {
+      "id": "missing-origin",
+      "group": "testOriginDisplayOmitsCredentialsPathsAndLoginTokens",
+      "url": null,
+      "expected": "无有效网站来源"
+    },
+    {
+      "id": "opaque-origin",
+      "group": "additionalPolicyBranches",
+      "url": "about:blank",
+      "expected": "无有效网站来源"
+    },
+    {
+      "id": "origin-normalized",
+      "group": "additionalPolicyBranches",
+      "url": "HTTPS://CHATGPT.COM/path?token=secret#fragment",
+      "expected": "https://chatgpt.com"
+    }
+  ]
+}
