@@ -6,6 +6,7 @@ final class ChatPanel: NSPanel, NSWindowDelegate {
     private static let frameKey = "PanelFrame"
     private let defaults: UserDefaults
     private var savedFrame: NSRect?
+    private let pageContainer = NSView()
     private let dragStrip = PanelDragView()
     private let originBadge = OriginBadgeView()
     private let navigationNotice = NavigationNoticeView()
@@ -24,8 +25,11 @@ final class ChatPanel: NSPanel, NSWindowDelegate {
         }
     }
 
-    override var contentView: NSView? {
-        didSet { installOverlays() }
+    var pageView: NSView? {
+        didSet {
+            oldValue?.removeFromSuperview()
+            installPage()
+        }
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -58,6 +62,15 @@ final class ChatPanel: NSPanel, NSWindowDelegate {
             }
         }
         delegate = self
+        contentView = pageContainer
+        dragStrip.translatesAutoresizingMaskIntoConstraints = false
+        pageContainer.addSubview(dragStrip)
+        NSLayoutConstraint.activate([
+            dragStrip.topAnchor.constraint(equalTo: pageContainer.topAnchor),
+            dragStrip.leadingAnchor.constraint(equalTo: pageContainer.leadingAnchor),
+            dragStrip.trailingAnchor.constraint(equalTo: pageContainer.trailingAnchor),
+            dragStrip.heightAnchor.constraint(equalToConstant: PanelDragView.height),
+        ])
     }
 
     override var canBecomeKey: Bool { true }
@@ -77,37 +90,40 @@ final class ChatPanel: NSPanel, NSWindowDelegate {
         (origin.isEmpty ? noticeAtTop : noticeBelowOrigin)?.isActive = true
     }
 
-    private func installOverlays() {
+    private func installPage() {
         navigationNotice.dismiss()
         noticeBelowOrigin?.isActive = false
         noticeAtTop?.isActive = false
         noticeBelowOrigin = nil
         noticeAtTop = nil
-        dragStrip.removeFromSuperview()
         originBadge.removeFromSuperview()
         pageLoadOverlay.removeFromSuperview()
         navigationNotice.removeFromSuperview()
-        guard let contentView else { return }
-        for overlay in [dragStrip, originBadge, pageLoadOverlay, navigationNotice] {
+        guard let pageView else { return }
+        pageView.translatesAutoresizingMaskIntoConstraints = false
+        pageContainer.addSubview(pageView, positioned: .below, relativeTo: dragStrip)
+        NSLayoutConstraint.activate([
+            pageView.topAnchor.constraint(equalTo: pageContainer.topAnchor),
+            pageView.leadingAnchor.constraint(equalTo: pageContainer.leadingAnchor),
+            pageView.trailingAnchor.constraint(equalTo: pageContainer.trailingAnchor),
+            pageView.bottomAnchor.constraint(equalTo: pageContainer.bottomAnchor),
+        ])
+        for overlay in [originBadge, pageLoadOverlay, navigationNotice] {
             overlay.translatesAutoresizingMaskIntoConstraints = false
-            contentView.addSubview(overlay, positioned: .above, relativeTo: nil)
+            pageView.addSubview(overlay, positioned: .above, relativeTo: nil)
         }
         NSLayoutConstraint.activate([
-            dragStrip.topAnchor.constraint(equalTo: contentView.topAnchor),
-            dragStrip.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            dragStrip.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            dragStrip.heightAnchor.constraint(equalToConstant: 8),
-            originBadge.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
-            originBadge.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            originBadge.widthAnchor.constraint(lessThanOrEqualTo: contentView.widthAnchor, constant: -24),
-            navigationNotice.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            navigationNotice.widthAnchor.constraint(lessThanOrEqualTo: contentView.widthAnchor, constant: -24),
-            pageLoadOverlay.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            pageLoadOverlay.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            pageLoadOverlay.widthAnchor.constraint(lessThanOrEqualTo: contentView.widthAnchor, constant: -32),
+            originBadge.topAnchor.constraint(equalTo: pageView.topAnchor, constant: 28),
+            originBadge.centerXAnchor.constraint(equalTo: pageView.centerXAnchor),
+            originBadge.widthAnchor.constraint(lessThanOrEqualTo: pageView.widthAnchor, constant: -24),
+            navigationNotice.centerXAnchor.constraint(equalTo: pageView.centerXAnchor),
+            navigationNotice.widthAnchor.constraint(lessThanOrEqualTo: pageView.widthAnchor, constant: -24),
+            pageLoadOverlay.centerXAnchor.constraint(equalTo: pageView.centerXAnchor),
+            pageLoadOverlay.centerYAnchor.constraint(equalTo: pageView.centerYAnchor),
+            pageLoadOverlay.widthAnchor.constraint(lessThanOrEqualTo: pageView.widthAnchor, constant: -32),
         ])
         noticeBelowOrigin = navigationNotice.topAnchor.constraint(equalTo: originBadge.bottomAnchor, constant: 6)
-        noticeAtTop = navigationNotice.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10)
+        noticeAtTop = navigationNotice.topAnchor.constraint(equalTo: pageView.topAnchor, constant: 28)
         updateNoticePosition()
     }
 
@@ -139,6 +155,39 @@ final class ChatPanel: NSPanel, NSWindowDelegate {
 
 @MainActor
 final class PanelDragView: NSView {
+    static let height: CGFloat = 24
+    static let handleSize = NSSize(width: 36, height: 4)
+
+    var handleRect: NSRect {
+        NSRect(x: bounds.midX - Self.handleSize.width / 2,
+               y: bounds.midY - Self.handleSize.height / 2,
+               width: Self.handleSize.width, height: Self.handleSize.height)
+    }
+
+    private var dragRect: NSRect { handleRect.insetBy(dx: -12, dy: -8) }
+
+    override func draw(_ dirtyRect: NSRect) {
+        NSGraphicsContext.saveGraphicsState()
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.25)
+        shadow.shadowBlurRadius = 2
+        shadow.shadowOffset = NSSize(width: 0, height: -0.5)
+        shadow.set()
+        NSColor.white.withAlphaComponent(0.85).setFill()
+        NSBezierPath(roundedRect: handleRect, xRadius: 2, yRadius: 2).fill()
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
+    override func resetCursorRects() {
+        addCursorRect(dragRect, cursor: .openHand)
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard super.hitTest(point) != nil,
+              dragRect.contains(convert(point, from: superview)) else { return nil }
+        return self
+    }
+
     override var mouseDownCanMoveWindow: Bool { true }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override func mouseDown(with event: NSEvent) { window?.performDrag(with: event) }

@@ -63,7 +63,7 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
             XCTAssertNil(owner.loginPopup)
             XCTAssertFalse(other.needsReloadOnDisplay)
             if switchAway {
-                XCTAssertTrue(owner.panel.contentView === other.webView)
+                XCTAssertTrue(owner.panel.pageView === other.webView)
                 XCTAssertTrue(opener.needsReloadOnDisplay)
                 await fulfillment(of: [try XCTUnwrap(premature)], timeout: 0.2)
                 XCTAssertTrue(requests.isEmpty)
@@ -73,7 +73,7 @@ final class NavigationDelegateTests: XCTestCase, @unchecked Sendable {
             await fulfillment(of: [reloaded], timeout: 3)
             XCTAssertEqual(requests.compactMap(\.url), [opener.policy.provider.home])
             XCTAssertFalse(opener.needsReloadOnDisplay)
-            XCTAssertTrue(owner.panel.contentView === opener.webView)
+            XCTAssertTrue(owner.panel.pageView === opener.webView)
             owner.displaySession(other)
             owner.displaySession(opener)
             await fulfillment(of: [unexpected], timeout: 0.2)

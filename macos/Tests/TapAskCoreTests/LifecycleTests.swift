@@ -72,7 +72,7 @@ final class LifecycleTests: XCTestCase {
         }
         XCTAssertNotNil(cachedSession, "The production cache must own the background session before removal")
         XCTAssertNotNil(visibleSession)
-        XCTAssertTrue(owner.panel.contentView === visibleWebView)
+        XCTAssertTrue(owner.panel.pageView === visibleWebView)
         autoreleasepool { owner.removeAllSessions() }
         advanceMainRunLoop(until: {
             cachedSession == nil && cachedWebView == nil && cachedDelegate == nil
@@ -84,7 +84,7 @@ final class LifecycleTests: XCTestCase {
         XCTAssertNil(visibleSession)
         XCTAssertNil(visibleWebView)
         XCTAssertNil(visibleDelegate)
-        XCTAssertNil(owner.panel.contentView)
+        XCTAssertNil(owner.panel.pageView)
         withExtendedLifetime(owner) {}
     }
 
@@ -176,7 +176,7 @@ final class LifecycleTests: XCTestCase {
         XCTAssertNotNil(current)
         XCTAssertNotNil(currentPage)
         XCTAssertTrue(owner.currentSession === current)
-        XCTAssertTrue(owner.panel.contentView === currentPage)
+        XCTAssertTrue(owner.panel.pageView === currentPage)
         XCTAssertTrue(currentPage?.navigationDelegate === current?.webDelegate)
         XCTAssertEqual(Array(owner.sessions.keys), [catalog.providers[2].id])
         XCTAssertNotNil(popup)
@@ -192,7 +192,7 @@ final class LifecycleTests: XCTestCase {
         owner.switchProvider(to: catalog.providers[0])
         let recreated = try XCTUnwrap(owner.sessions[catalog.providers[0].id])
         XCTAssertTrue(owner.currentSession === recreated)
-        XCTAssertTrue(owner.panel.contentView === recreated.webView)
+        XCTAssertTrue(owner.panel.pageView === recreated.webView)
         XCTAssertTrue(recreated.webView.configuration.websiteDataStore === store)
         XCTAssertTrue(recreated.webView.navigationDelegate === recreated.webDelegate)
         XCTAssertEqual(owner.sessions.count, 2)
@@ -255,7 +255,7 @@ final class LifecycleTests: XCTestCase {
         XCTAssertNil(backgroundPage)
         XCTAssertNil(backgroundDelegate)
         XCTAssertTrue(owner.currentSession === current)
-        XCTAssertTrue(owner.panel.contentView === current.webView)
+        XCTAssertTrue(owner.panel.pageView === current.webView)
         XCTAssertTrue(owner.loginPopup === popup)
         XCTAssertNotNil(popup)
         XCTAssertEqual(owner.sessions.count, 1)
@@ -311,7 +311,7 @@ final class LifecycleTests: XCTestCase {
         XCTAssertNil(backgroundDelegate)
         XCTAssertEqual(owner.sessions.count, 1)
         XCTAssertTrue(owner.currentSession === current)
-        XCTAssertTrue(owner.panel.contentView === current.webView)
+        XCTAssertTrue(owner.panel.pageView === current.webView)
     }
 
     @MainActor
@@ -382,7 +382,7 @@ final class LifecycleTests: XCTestCase {
         XCTAssertNil(owner.backgroundPageReleaseTask)
         XCTAssertTrue(owner.sessions.isEmpty)
         XCTAssertNil(owner.currentSession)
-        XCTAssertNil(owner.panel.contentView)
+        XCTAssertNil(owner.panel.pageView)
     }
 
     @MainActor
@@ -578,7 +578,7 @@ final class LifecycleTests: XCTestCase {
         try autoreleasepool {
             let created = ChatPanel(defaults: defaults)
             panel = created
-            created.contentView = content
+            created.pageView = content
             overlay = try XCTUnwrap(content.subviews.compactMap { $0 as? PageLoadOverlayView }.first)
             created.updateLoadState(.loading, providerName: "Local fixture")
         }
@@ -589,7 +589,7 @@ final class LifecycleTests: XCTestCase {
         await fulfillment(of: [taskStarted], timeout: 0.3)
         XCTAssertEqual(overlay?.isHidden, true)
         autoreleasepool {
-            panel?.contentView = nil // Production overlay removal in ChatPanel.installOverlays().
+            panel?.pageView = nil // Production page and overlay removal.
             panel = nil
         }
         XCTAssertNil(overlay, "The pending loading Task must not retain the removed overlay across its delay")
@@ -662,7 +662,7 @@ final class LifecycleTests: XCTestCase {
             let created = ChatPanel(defaults: defaults)
             panel = created
             window = created
-            created.contentView = content
+            created.pageView = content
             notice = try XCTUnwrap(content.subviews.compactMap { $0 as? NavigationNoticeView }.first)
             created.showNavigationNotice(try XCTUnwrap(navigationNotice(for: .action, mainFrame: true,
                 decision: .browser, host: "example.invalid", providerName: "ChatGPT")))
@@ -670,7 +670,7 @@ final class LifecycleTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(50))
         XCTAssertEqual(notice?.isHidden, false)
         autoreleasepool {
-            panel?.contentView = nil
+            panel?.pageView = nil
             panel = nil
         }
         advanceMainRunLoop(until: { window == nil && notice == nil })

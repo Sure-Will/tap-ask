@@ -185,7 +185,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     func displaySession(_ session: ProviderSession) {
         sessions[session.policy.provider.id] = session
         currentSession = session
-        panel.contentView = session.webView
+        panel.pageView = session.webView
         panel.origin = session.title
         panel.updateLoadState(session.loadState, providerName: session.policy.provider.name)
         if panel.isVisible, !NSApp.isHidden { panel.makeKeyAndOrderFront(nil) }
@@ -203,7 +203,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         retentionPolicy.reset()
         for session in sessions.values { session.dispose() }
         panel?.makeFirstResponder(nil)
-        panel?.contentView = nil
+        panel?.pageView = nil
         currentSession = nil
         sessions.removeAll()
     }

@@ -206,7 +206,32 @@ final class ChatPanelTests: XCTestCase {
     }
 
     @MainActor
-    func testTopClicksReachWebViewExceptEightPointDragStrip() throws {
+    func testDragOverlayPaintsOnlyTheWhiteHandleOnTransparentPixels() throws {
+        let strip = PanelDragView(frame: NSRect(x: 0, y: 0, width: 120, height: 24))
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 120, pixelsHigh: 24,
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+            colorSpaceName: .calibratedRGB, bytesPerRow: 0, bitsPerPixel: 0))
+        let context = try XCTUnwrap(NSGraphicsContext(bitmapImageRep: bitmap))
+        do {
+            NSGraphicsContext.saveGraphicsState()
+            defer { NSGraphicsContext.restoreGraphicsState() }
+            NSGraphicsContext.current = context
+            NSColor.clear.setFill()
+            strip.bounds.fill(using: .copy)
+            strip.draw(strip.bounds)
+        }
+        let corner = try XCTUnwrap(bitmap.colorAt(x: 2, y: 2))
+        let center = try XCTUnwrap(bitmap.colorAt(x: 60, y: 12)?.usingColorSpace(.sRGB))
+        XCTAssertEqual(corner.alphaComponent, 0, accuracy: 0.001)
+        XCTAssertGreaterThan(center.alphaComponent, 0.8)
+        XCTAssertGreaterThan(center.redComponent, 0.9)
+        XCTAssertGreaterThan(center.greenComponent, 0.9)
+        XCTAssertGreaterThan(center.blueComponent, 0.9)
+        XCTAssertFalse(strip.isOpaque)
+    }
+
+    @MainActor
+    func testTransparentDragOverlayKeepsWebViewFullSizeAndPassesSurroundingClicksThrough() throws {
         _ = NSApplication.shared
         let suite = "TapAsk.ChatPanelTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -216,7 +241,7 @@ final class ChatPanelTests: XCTestCase {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
         let webView = WKWebView(frame: .zero, configuration: configuration)
-        panel.contentView = webView
+        panel.pageView = webView
         panel.orderFront(nil)
         panel.showNavigationNotice(try XCTUnwrap(navigationNotice(for: .action, mainFrame: true,
             decision: .cancel, host: "example.invalid", providerName: "ChatGPT")))
@@ -230,19 +255,33 @@ final class ChatPanelTests: XCTestCase {
                 panel.origin = origin
                 let frameView = try XCTUnwrap(panel.contentView?.superview)
                 frameView.layoutSubtreeIfNeeded()
-                XCTAssertEqual(webView.frame, frameView.bounds)
+                let content = try XCTUnwrap(panel.contentView)
+                let dragStrip = try XCTUnwrap(content.subviews.compactMap { $0 as? PanelDragView }.first)
+                XCTAssertTrue(webView.superview === content)
+                XCTAssertEqual(webView.frame, content.bounds)
+                XCTAssertEqual(dragStrip.frame.maxY, content.bounds.maxY, accuracy: 0.5)
+                XCTAssertEqual(dragStrip.frame.height, 24, accuracy: 0.5)
+                XCTAssertEqual(dragStrip.handleRect.size, NSSize(width: 36, height: 4))
+                XCTAssertEqual(dragStrip.handleRect.midX, dragStrip.bounds.midX, accuracy: 0.5)
+                XCTAssertEqual(dragStrip.handleRect.midY, dragStrip.bounds.midY, accuracy: 0.5)
+                XCTAssertFalse(dragStrip.isOpaque)
                 XCTAssertFalse(notice.isHidden)
                 XCTAssertTrue(webView.bounds.contains(notice.frame))
                 XCTAssertEqual(notice.frame.midX, webView.bounds.midX, accuracy: 0.5)
                 let noticeTop = webView.isFlipped ? notice.frame.minY : webView.bounds.maxY - notice.frame.maxY
+                let badgeTop = webView.isFlipped ? badge.frame.minY : webView.bounds.maxY - badge.frame.maxY
                 let badgeBottom = webView.isFlipped ? badge.frame.maxY : webView.bounds.maxY - badge.frame.minY
-                XCTAssertEqual(noticeTop, origin.isEmpty ? 10 : badgeBottom + 6, accuracy: 0.5)
-                let noticePoint = frameView.convert(NSPoint(x: notice.bounds.midX, y: notice.bounds.midY), from: notice)
+                if !origin.isEmpty { XCTAssertEqual(badgeTop, 28, accuracy: 0.5) }
+                XCTAssertEqual(noticeTop, origin.isEmpty ? 28 : badgeBottom + 6, accuracy: 0.5)
+                // Probe away from the handle's intentional drag target.
+                let noticePoint = frameView.convert(NSPoint(x: notice.bounds.minX + 4, y: notice.bounds.midY), from: notice)
                 let noticeHit = frameView.hitTest(noticePoint)
                 XCTAssertTrue(noticeHit === webView || noticeHit?.isDescendant(of: webView) == true)
                 XCTAssertFalse(noticeHit === notice || noticeHit?.isDescendant(of: notice) == true)
-                // Nine points is inside the top ten, immediately below the drag strip.
-                for depth: CGFloat in [9, 20, 28] {
+                // Only the small rectangle around the handle captures clicks.
+                // The outermost point remains the native window's resize edge.
+                XCTAssertFalse(frameView.hitTest(point(atDepth: 1, in: frameView)) is PanelDragView)
+                for depth: CGFloat in [23, 28, 44] {
                     let hit = frameView.hitTest(point(atDepth: depth, in: frameView))
                     XCTAssertTrue(hit === webView || hit?.isDescendant(of: webView) == true,
                                   "Top \(depth)pt hit \(String(describing: hit)); must reach WKWebView")
@@ -250,9 +289,25 @@ final class ChatPanelTests: XCTestCase {
                     XCTAssertFalse(hit is OriginBadgeView)
                     XCTAssertFalse(hit is NavigationNoticeView)
                 }
-                let drag = frameView.hitTest(point(atDepth: 4, in: frameView))
-                XCTAssertTrue(drag is PanelDragView)
-                XCTAssertEqual(drag?.mouseDownCanMoveWindow, true)
+                for depth: CGFloat in [4, 12, 20] {
+                    let drag = frameView.hitTest(point(atDepth: depth, in: frameView))
+                    XCTAssertTrue(drag === dragStrip)
+                    XCTAssertEqual(drag?.mouseDownCanMoveWindow, true)
+                }
+                for offset: CGFloat in [-31, -29, 29, 31] {
+                    var point = point(atDepth: 12, in: frameView)
+                    point.x += offset
+                    let hit = frameView.hitTest(point)
+                    if abs(offset) < 30 { XCTAssertTrue(hit === dragStrip) }
+                    else { XCTAssertTrue(hit === webView || hit?.isDescendant(of: webView) == true) }
+                }
+                for x: CGFloat in [24, frameView.bounds.width - 24] {
+                    var point = point(atDepth: 12, in: frameView)
+                    point.x = x
+                    let hit = frameView.hitTest(point)
+                    XCTAssertTrue(hit === webView || hit?.isDescendant(of: webView) == true)
+                    XCTAssertFalse(hit is PanelDragView)
+                }
             }
         }
     }
@@ -267,18 +322,22 @@ final class ChatPanelTests: XCTestCase {
         defer { panel.orderOut(nil) }
         let previous = NSView()
         let current = NSView()
-        panel.contentView = previous
+        panel.pageView = previous
         panel.showNavigationNotice(try XCTUnwrap(navigationNotice(for: .action, mainFrame: true,
             decision: .browser, host: "example.invalid", providerName: "ChatGPT")))
         panel.origin = "https://accounts.google.com"
         panel.updateLoadState(.failed(PageLoadFailure(domain: "NSURLErrorDomain", code: -1001)),
                               providerName: "ChatGPT")
-        panel.contentView = current
+        panel.pageView = current
         let badge = try XCTUnwrap(current.subviews.first { $0 is OriginBadgeView } as? OriginBadgeView)
         let loadOverlay = try XCTUnwrap(current.subviews.first { $0 is PageLoadOverlayView })
         current.layoutSubtreeIfNeeded()
         XCTAssertTrue(previous.subviews.isEmpty)
-        XCTAssertEqual(current.subviews.filter { $0 is PanelDragView }.count, 1)
+        XCTAssertNil(previous.superview)
+        let content = try XCTUnwrap(panel.contentView)
+        XCTAssertTrue(current.superview === content)
+        XCTAssertEqual(content.subviews.filter { $0 is PanelDragView }.count, 1)
+        XCTAssertFalse(current.subviews.contains { $0 is PanelDragView })
         XCTAssertEqual(current.subviews.filter { $0 is PageLoadOverlayView }.count, 1)
         let notice = try XCTUnwrap(current.subviews.compactMap { $0 as? NavigationNoticeView }.first)
         XCTAssertTrue(notice.isHidden, "A provider switch must clear the previous page's notice")
@@ -292,6 +351,13 @@ final class ChatPanelTests: XCTestCase {
         panel.setFrame(NSRect(x: 80, y: 90, width: 400, height: 600), display: false)
         panel.windowDidMove(Notification(name: NSWindow.didMoveNotification, object: panel))
         XCTAssertEqual(defaults.string(forKey: "PanelFrame"), NSStringFromRect(panel.frame))
+        panel.pageView = nil
+        XCTAssertNil(panel.pageView)
+        XCTAssertTrue(panel.contentView === content)
+        XCTAssertNil(current.superview)
+        XCTAssertTrue(current.subviews.isEmpty)
+        XCTAssertEqual(content.subviews.count, 1)
+        XCTAssertTrue(content.subviews.first is PanelDragView)
     }
 
     @MainActor
@@ -305,7 +371,7 @@ final class ChatPanelTests: XCTestCase {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .nonPersistent()
         let webView = WKWebView(frame: .zero, configuration: configuration)
-        panel.contentView = webView
+        panel.pageView = webView
         panel.orderFront(nil)
         let frameView = try XCTUnwrap(webView.superview)
         let overlay = try XCTUnwrap(webView.subviews.first { $0 is PageLoadOverlayView })
@@ -332,7 +398,7 @@ final class ChatPanelTests: XCTestCase {
             frameView.layoutSubtreeIfNeeded()
             XCTAssertTrue(overlay.isHidden)
             XCTAssertNil(overlay.hitTest(NSPoint(x: overlay.frame.midX, y: overlay.frame.midY)))
-            for point in [point(atDepth: 9, in: frameView),
+            for point in [point(atDepth: 25, in: frameView),
                           NSPoint(x: frameView.bounds.midX, y: frameView.bounds.midY)] {
                 let hit = frameView.hitTest(point)
                 XCTAssertTrue(hit === webView || hit?.isDescendant(of: webView) == true)
