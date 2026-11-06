@@ -28,11 +28,14 @@ if [[ "$2" == 100 ]]; then
     fi
     exit 0
 fi
+if [[ "$MEMORY_FIXTURE_MODE" == all-webkit-exit && -f "$MEMORY_FIXTURE_ROOT/sampled" ]]; then
+    exit 1
+fi
 if [[ "$4" == lstart= ]]; then
     case "$2" in
         200)
             case "$MEMORY_FIXTURE_MODE" in
-                reused-pid) echo 'Fri Nov  6 01:00:08 2026' ;;
+                reused-pid|only-reused) echo 'Fri Nov  6 01:00:08 2026' ;;
                 connection-grace) echo 'Fri Nov  6 01:00:07 2026' ;;
                 *) echo 'Fri Nov  6 01:00:04 2026' ;;
             esac
@@ -61,6 +64,14 @@ cat > "$fixture/bin/log" <<'SH'
 [[ "$*" == *'processID == 100 AND eventMessage CONTAINS "didConnectToProcess"'* ]] || exit 2
 [[ "$*" == *'--start 2026-11-06 01:00:00'* ]] || exit 2
 [[ "$MEMORY_FIXTURE_MODE" == no-webkit ]] && exit 0
+if [[ "$MEMORY_FIXTURE_MODE" == only-exited ]]; then
+    echo '2026-11-06 01:00:06.000 Df TapAsk-Debug[100] WebProcessProxy::didConnectToProcess [PID=203]'
+    exit 0
+fi
+if [[ "$MEMORY_FIXTURE_MODE" == only-reused ]]; then
+    echo '2026-11-06 01:00:05.500 Df TapAsk-Debug[100] WebProcessProxy::didConnectToProcess [PID=200]'
+    exit 0
+fi
 printf '%s\n' \
     '2026-11-06 01:00:01.000 Df TapAsk-Debug[100] WebProcessProxy::didConnectToProcess [PID=200]' \
     '2026-11-06 01:00:02.000 Df TapAsk-Debug[100] NetworkProcessProxy::didConnectToProcess [PID=201]' \
@@ -79,6 +90,9 @@ if [[ "$MEMORY_FIXTURE_MODE" == footprint-failed && "$4" == 202 ]]; then
 fi
 if [[ "$MEMORY_FIXTURE_MODE" == gpu-exits && "$4" == 202 ]]; then
     touch "$MEMORY_FIXTURE_ROOT/gpu-exited"
+    exit 1
+fi
+if [[ "$MEMORY_FIXTURE_MODE" == all-webkit-exit && "$4" != 100 ]]; then
     exit 1
 fi
 case "$4" in
@@ -121,7 +135,7 @@ fi
 [[ "$(tail -n 1 "$csv")" == *',"TapAsk-Debug",8.000,3' ]]
 [[ "$(cat "$fixture/stderr")" == *'Skipping PID 200:'*'PID reused'* ]]
 
-for mode in missing multiple log-failed footprint-failed malformed restarted; do
+for mode in missing multiple log-failed footprint-failed malformed restarted no-webkit only-exited only-reused all-webkit-exit; do
     export MEMORY_FIXTURE_MODE="$mode"
     cp "$csv" "$fixture/before.csv"
     rm -f "$fixture/sampled"
@@ -130,13 +144,20 @@ for mode in missing multiple log-failed footprint-failed malformed restarted; do
         exit 1
     fi
     cmp "$csv" "$fixture/before.csv"
+    case "$mode" in
+        no-webkit|only-exited|only-reused)
+            [[ ! -f "$fixture/sampled" ]]
+            [[ "$(cat "$fixture/output")" == *'No live owned WebKit processes'*'no CSV row appended'* ]]
+            ;;
+        all-webkit-exit)
+            [[ "$(cat "$fixture/sampled")" == $'100\n200\n201\n202' ]]
+            [[ "$(cat "$fixture/output")" == *'No WebKit processes were measured'*'no CSV row appended'* ]]
+            ;;
+    esac
 done
 
 export MEMORY_FIXTURE_MODE=gpu-exits
 "$measurement" TapAsk-Debug > "$fixture/output"
 [[ "$(tail -n 1 "$csv")" == *',"TapAsk-Debug",6.000,3' ]]
-export MEMORY_FIXTURE_MODE=no-webkit
-"$measurement" TapAsk-Debug > "$fixture/output" 2>&1
-[[ "$(tail -n 1 "$csv")" == *',"TapAsk-Debug",1.000,1' ]]
-[[ "$(wc -l < "$csv" | tr -d ' ')" == 6 ]]
-echo 'Memory script fixtures passed (ownership, PID reuse, connection grace, deduplication, byte totals, CSV, exits and error paths).'
+[[ "$(wc -l < "$csv" | tr -d ' ')" == 5 ]]
+echo 'Memory script fixtures passed (ownership, PID reuse, connection grace, deduplication, byte totals, CSV, incomplete-sample rejection, exits and error paths).'

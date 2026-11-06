@@ -89,7 +89,7 @@ final class LifecycleTests: XCTestCase {
     }
 
     @MainActor
-    func testReleaseOtherPagesReleasesTwoSessionsKeepsCurrentPopupAndAllowsRecreation() throws {
+    func testCapacityEvictionThenManualReleaseKeepCurrentPopupAndAllowRecreation() throws {
         _ = NSApplication.shared
         let suite = "TapAsk.LifecycleTests.\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
@@ -114,10 +114,16 @@ final class LifecycleTests: XCTestCase {
         weak var currentPage: WKWebView?
         weak var firstDelegate: WebViewDelegate?
         weak var secondDelegate: WebViewDelegate?
-        autoreleasepool {
+        try autoreleasepool {
             for (index, provider) in catalog.providers.enumerated() {
                 let session = owner.makeSession(for: provider)
-                owner.displaySession(session)
+                if index == 2 {
+                    let evicted = try XCTUnwrap(first)
+                    owner.displaySession(session)
+                    assertSessionDisposed(evicted)
+                } else {
+                    owner.displaySession(session)
+                }
                 loadLocalPage(session.webView, provider: provider)
                 defaults.set("https://\(provider.hosts[0])/conversation/last", forKey: "LastPage.\(provider.id)")
                 switch index {
@@ -136,6 +142,11 @@ final class LifecycleTests: XCTestCase {
                 XCTAssertEqual(owner.validateMenuItem(releaseItem), index > 0)
             }
         }
+        advanceMainRunLoop(until: { first == nil && firstPage == nil && firstDelegate == nil })
+        XCTAssertNil(first, "Displaying a third provider must release the oldest background page")
+        XCTAssertNil(firstPage)
+        XCTAssertNil(firstDelegate)
+        XCTAssertEqual(owner.sessions.count, 2)
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = store
         _ = owner.openLoginPopup(configuration: configuration, policy: try XCTUnwrap(current).policy,
@@ -147,21 +158,11 @@ final class LifecycleTests: XCTestCase {
             popupPage = owner.loginPopup?.webView
         }
         try autoreleasepool {
-            let released = [try XCTUnwrap(first), try XCTUnwrap(second)]
+            let released = try XCTUnwrap(second)
             owner.releaseOtherProviderPages(nil)
-            for session in released {
-                XCTAssertNil(session.onLoadStateChange)
-                XCTAssertNil(session.onCommit)
-                XCTAssertNil(session.webDelegate.onLoadStateChange)
-                XCTAssertNil(session.webDelegate.onCommit)
-                XCTAssertNil(session.webDelegate.onProcessTermination)
-                XCTAssertNil(session.webDelegate.onNavigationNotice)
-                XCTAssertNil(session.webDelegate.onCreatePopup)
-                XCTAssertNil(session.webDelegate.onClose)
-                XCTAssertNil(session.webView.navigationDelegate)
-                XCTAssertNil(session.webView.uiDelegate)
-            }
+            assertSessionDisposed(released)
         }
+        XCTAssertNil(owner.backgroundPageReleaseTask)
         advanceMainRunLoop(until: {
             first == nil && second == nil && firstPage == nil && secondPage == nil
                 && firstDelegate == nil && secondDelegate == nil
@@ -197,6 +198,264 @@ final class LifecycleTests: XCTestCase {
         XCTAssertEqual(owner.sessions.count, 2)
         XCTAssertTrue(owner.validateMenuItem(releaseItem))
         XCTAssertNil(first, "The released session must not be resurrected")
+    }
+
+    @MainActor
+    func testBackgroundExpiresAtFiveMinutesWhileHiddenCurrentAndPopupStayAlive() throws {
+        _ = NSApplication.shared
+        let suite = "TapAsk.LifecycleTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let catalog = try localCatalog()
+        var now = ContinuousClock.now
+        let owner = AppDelegate(catalog: catalog, defaults: defaults, websiteDataStore: .nonPersistent(),
+                                retentionNow: { now })
+        owner.configurePanel()
+        defer {
+            owner.closeLoginPopup(restoreFocus: false)
+            owner.removeAllSessions()
+            owner.panel.orderOut(nil)
+        }
+        weak var background: ProviderSession?
+        weak var backgroundPage: WKWebView?
+        weak var backgroundDelegate: WebViewDelegate?
+        autoreleasepool {
+            let session = owner.makeSession(for: catalog.providers[0])
+            background = session
+            backgroundPage = session.webView
+            backgroundDelegate = session.webDelegate
+            owner.displaySession(session)
+        }
+        XCTAssertNil(owner.backgroundPageReleaseTask)
+        let current = owner.makeSession(for: catalog.providers[1])
+        // AppKit autoreleases the replaced content view. Drain that replacement before
+        // checking whether expiration has released the former page's final owner.
+        autoreleasepool { owner.displaySession(current) }
+        XCTAssertNotNil(owner.backgroundPageReleaseTask)
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        _ = owner.openLoginPopup(configuration: configuration, policy: current.policy, initialURL: nil)
+        weak var popup: LoginPopup?
+        popup = owner.loginPopup
+        XCTAssertFalse(owner.panel.isVisible)
+
+        now = now.advanced(by: .seconds(299))
+        owner.releaseExpiredBackgroundPages()
+        XCTAssertNotNil(background)
+        XCTAssertEqual(owner.sessions.count, 2)
+        XCTAssertNotNil(owner.backgroundPageReleaseTask)
+        now = now.advanced(by: .seconds(1))
+        try autoreleasepool {
+            let expired = try XCTUnwrap(background)
+            owner.releaseExpiredBackgroundPages()
+            assertSessionDisposed(expired)
+        }
+        advanceMainRunLoop(until: { background == nil && backgroundPage == nil && backgroundDelegate == nil })
+        XCTAssertNil(background)
+        XCTAssertNil(backgroundPage)
+        XCTAssertNil(backgroundDelegate)
+        XCTAssertTrue(owner.currentSession === current)
+        XCTAssertTrue(owner.panel.contentView === current.webView)
+        XCTAssertTrue(owner.loginPopup === popup)
+        XCTAssertNotNil(popup)
+        XCTAssertEqual(owner.sessions.count, 1)
+        XCTAssertNil(owner.backgroundPageReleaseTask)
+
+        now = now.advanced(by: .seconds(600))
+        owner.releaseExpiredBackgroundPages()
+        XCTAssertTrue(owner.currentSession === current, "Hiding the panel must not expire its current session")
+        XCTAssertTrue(owner.loginPopup === popup)
+    }
+
+    @MainActor
+    func testBackgroundReleaseTaskAutomaticallyReleasesExpiredPage() async throws {
+        _ = NSApplication.shared
+        let suite = "TapAsk.LifecycleTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let catalog = try localCatalog()
+        var injectedNow: ContinuousClock.Instant?
+        let owner = AppDelegate(catalog: catalog, defaults: defaults, websiteDataStore: .nonPersistent(),
+                                retentionNow: { injectedNow ?? ContinuousClock.now })
+        owner.configurePanel()
+        defer {
+            owner.removeAllSessions()
+            owner.panel.orderOut(nil)
+        }
+        weak var background: ProviderSession?
+        weak var backgroundPage: WKWebView?
+        weak var backgroundDelegate: WebViewDelegate?
+        autoreleasepool {
+            let session = owner.makeSession(for: catalog.providers[0])
+            background = session
+            backgroundPage = session.webView
+            backgroundDelegate = session.webDelegate
+            owner.displaySession(session)
+        }
+        let current = owner.makeSession(for: catalog.providers[1])
+        // Record the background transition five minutes ago so the actual Task's
+        // ContinuousClock deadline has passed before its first main-actor turn.
+        injectedNow = ContinuousClock.now.advanced(by: .seconds(-300))
+        autoreleasepool { owner.displaySession(current) }
+        injectedNow = nil
+        XCTAssertNotNil(owner.backgroundPageReleaseTask)
+        XCTAssertNotNil(background)
+
+        let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+        while owner.backgroundPageReleaseTask != nil, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertNil(owner.backgroundPageReleaseTask, "The scheduled Task must expire the page without a manual sweep")
+        XCTAssertNil(background)
+        XCTAssertNil(backgroundPage)
+        XCTAssertNil(backgroundDelegate)
+        XCTAssertEqual(owner.sessions.count, 1)
+        XCTAssertTrue(owner.currentSession === current)
+        XCTAssertTrue(owner.panel.contentView === current.webView)
+    }
+
+    @MainActor
+    func testSwitchBackResetsBackgroundDeadlineAndExpiredSwitchCreatesNewSession() throws {
+        _ = NSApplication.shared
+        let suite = "TapAsk.LifecycleTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let catalog = try localCatalog()
+        var now = ContinuousClock.now
+        let owner = AppDelegate(catalog: catalog, defaults: defaults, websiteDataStore: .nonPersistent(),
+                                retentionNow: { now })
+        owner.configurePanel()
+        defer {
+            owner.removeAllSessions()
+            owner.panel.orderOut(nil)
+        }
+        weak var first: ProviderSession?
+        weak var second: ProviderSession?
+        autoreleasepool {
+            let session = owner.makeSession(for: catalog.providers[0])
+            first = session
+            owner.displaySession(session)
+        }
+        now = now.advanced(by: .seconds(50))
+        autoreleasepool {
+            let session = owner.makeSession(for: catalog.providers[1])
+            second = session
+            owner.displaySession(session)
+        }
+        now = now.advanced(by: .seconds(50))
+        owner.switchProvider(to: catalog.providers[0])
+        XCTAssertTrue(owner.currentSession === first, "A still-retained provider must reuse its instance")
+        XCTAssertNotNil(owner.backgroundPageReleaseTask)
+
+        now = now.advanced(by: .seconds(250)) // The original first-page deadline.
+        owner.releaseExpiredBackgroundPages()
+        XCTAssertTrue(owner.currentSession === first)
+        XCTAssertNotNil(second, "The obsolete first-page deadline must not expire the new background page")
+        now = now.advanced(by: .seconds(50))
+        autoreleasepool { owner.switchProvider(to: catalog.providers[1]) }
+        advanceMainRunLoop(until: { second == nil })
+        XCTAssertNil(second, "Switching to an expired provider must rebuild it before selection")
+        XCTAssertEqual(owner.currentSession.policy.provider.id, catalog.providers[1].id)
+        XCTAssertEqual(owner.sessions.count, 2)
+        XCTAssertNotNil(owner.backgroundPageReleaseTask)
+
+        owner.releaseOtherProviderPages(nil)
+        XCTAssertNil(owner.backgroundPageReleaseTask)
+        now = now.advanced(by: .seconds(1_000))
+        owner.releaseExpiredBackgroundPages()
+        XCTAssertEqual(owner.sessions.count, 1)
+        owner.displaySession(owner.makeSession(for: catalog.providers[0]))
+        XCTAssertNotNil(owner.backgroundPageReleaseTask)
+        owner.removeAllSessions()
+        XCTAssertNil(owner.backgroundPageReleaseTask)
+        XCTAssertTrue(owner.sessions.isEmpty)
+
+        // A fresh session after cleanup must have no deadline left over from the previous cache.
+        owner.displaySession(owner.makeSession(for: catalog.providers[0]))
+        now = now.advanced(by: .seconds(1_000))
+        owner.releaseExpiredBackgroundPages()
+        XCTAssertEqual(owner.sessions.count, 1)
+        XCTAssertNil(owner.backgroundPageReleaseTask)
+        owner.displaySession(owner.makeSession(for: catalog.providers[1]))
+        XCTAssertNotNil(owner.backgroundPageReleaseTask)
+        owner.applicationWillTerminate(Notification(name: NSApplication.willTerminateNotification))
+        XCTAssertNil(owner.backgroundPageReleaseTask)
+        XCTAssertTrue(owner.sessions.isEmpty)
+        XCTAssertNil(owner.currentSession)
+        XCTAssertNil(owner.panel.contentView)
+    }
+
+    @MainActor
+    func testReleaseSavesLatestSPAPathAndRestoresItWithTheSameWebsiteStore() async throws {
+        _ = NSApplication.shared
+        let suite = "TapAsk.LifecycleTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let catalog = try localCatalog(firstHome: "https://one.invalid/")
+        let store = WKWebsiteDataStore.nonPersistent()
+        let owner = AppDelegate(catalog: catalog, defaults: defaults, websiteDataStore: store)
+        owner.configurePanel()
+        defer {
+            owner.removeAllSessions()
+            owner.panel.orderOut(nil)
+        }
+        var session: ProviderSession? = owner.makeSession(for: catalog.providers[0])
+        weak var original: ProviderSession?
+        original = session
+        owner.displaySession(try XCTUnwrap(session))
+        try await loadLocalSPA(try XCTUnwrap(session), baseURL: catalog.providers[0].home,
+                               path: "/conversation/latest?token=secret#draft")
+        XCTAssertEqual(defaults.string(forKey: "LastPage.local-one"), "https://one.invalid/",
+                       "pushState changes the current URL without committing a new document")
+        owner.displaySession(owner.makeSession(for: catalog.providers[1]))
+        session = nil
+        autoreleasepool { owner.releaseOtherProviderPages(nil) }
+        advanceMainRunLoop(until: { original == nil })
+        XCTAssertNil(original)
+        let saved = "https://one.invalid/conversation/latest"
+        XCTAssertEqual(defaults.string(forKey: "LastPage.local-one"), saved)
+
+        // Observe the initial request before WebKit can contact a host.
+        let restored = owner.makeSession(for: catalog.providers[0])
+        let observer = LifecycleNavigationObserver()
+        let request = expectation(description: "A recreated session restores the sanitized SPA path")
+        observer.onRequest = { value in
+            XCTAssertEqual(value.url?.absoluteString, saved)
+            XCTAssertEqual(value.timeoutInterval, 20)
+            request.fulfill()
+        }
+        restored.webView.navigationDelegate = observer
+        owner.displaySession(restored)
+        restored.loadInitialPage()
+        await fulfillment(of: [request], timeout: 3)
+        XCTAssertTrue(restored.webView.configuration.websiteDataStore === store)
+        withExtendedLifetime(observer) {}
+    }
+
+    @MainActor
+    func testReleaseDoesNotOverwriteLastPageDuringNavigationOrOnIdentityPage() async throws {
+        let suite = "TapAsk.LifecycleTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let provider = try localCatalog(firstHome: "https://one.invalid/").providers[0]
+        let saved = "https://one.invalid/conversation/previous"
+        let navigating = ProviderSession(provider: provider, identityHosts: [], defaults: defaults,
+                                         websiteDataStore: .nonPersistent())
+        try await loadLocalSPA(navigating, baseURL: provider.home, path: "/conversation/unfinished")
+        defaults.set(saved, forKey: "LastPage.local-one")
+        navigating.webView.loadHTMLString("<html><body>Next document</body></html>", baseURL: provider.home)
+        XCTAssertTrue(navigating.webView.isLoading)
+        XCTAssertEqual(navigating.loadState, .loaded, "The prior committed document remains loaded during navigation")
+        navigating.dispose()
+        XCTAssertEqual(defaults.string(forKey: "LastPage.local-one"), saved)
+
+        let identity = ProviderSession(provider: provider, identityHosts: ["identity.invalid"], defaults: defaults,
+                                       websiteDataStore: .nonPersistent())
+        try await loadLocalSPA(identity, baseURL: URL(string: "https://identity.invalid/")!, path: "/login/done")
+        defaults.set(saved, forKey: "LastPage.local-one")
+        identity.dispose()
+        XCTAssertEqual(defaults.string(forKey: "LastPage.local-one"), saved,
+                       "A completed identity-provider document must never replace the provider's LastPage")
     }
 
     @MainActor
@@ -452,6 +711,42 @@ final class LifecycleTests: XCTestCase {
         XCTAssertEqual(targetItems.count, providers.count * 2 + 4)
         for item in targetItems { XCTAssertNil(item.target) }
         withExtendedLifetime((mainMenu, status)) {}
+    }
+
+    @MainActor
+    private func assertSessionDisposed(_ session: ProviderSession,
+                                       file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertNil(session.onLoadStateChange, file: file, line: line)
+        XCTAssertNil(session.onCommit, file: file, line: line)
+        XCTAssertNil(session.webDelegate.onLoadStateChange, file: file, line: line)
+        XCTAssertNil(session.webDelegate.onCommit, file: file, line: line)
+        XCTAssertNil(session.webDelegate.onProcessTermination, file: file, line: line)
+        XCTAssertNil(session.webDelegate.onNavigationNotice, file: file, line: line)
+        XCTAssertNil(session.webDelegate.onCreatePopup, file: file, line: line)
+        XCTAssertNil(session.webDelegate.onClose, file: file, line: line)
+        XCTAssertNil(session.webView.navigationDelegate, file: file, line: line)
+        XCTAssertNil(session.webView.uiDelegate, file: file, line: line)
+    }
+
+    @MainActor
+    private func loadLocalSPA(_ session: ProviderSession, baseURL: URL, path: String,
+                              file: StaticString = #filePath, line: UInt = #line) async throws {
+        // The fixture itself changes its history after loading; production never injects script.
+        let destination = String(decoding: try JSONEncoder().encode(path), as: UTF8.self)
+        session.webView.loadHTMLString("""
+            <html><body>Local SPA fixture<script>
+            window.addEventListener("load", () => { history.pushState(null, "", \(destination)); });
+            </script></body></html>
+            """, baseURL: baseURL)
+        let expected = try XCTUnwrap(URL(string: path, relativeTo: baseURL)?.absoluteURL, file: file, line: line)
+        let deadline = ContinuousClock.now.advanced(by: .seconds(5))
+        while (session.webView.isLoading || session.loadState != .loaded || session.webView.url != expected),
+              ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        XCTAssertFalse(session.webView.isLoading, file: file, line: line)
+        XCTAssertEqual(session.loadState, .loaded, file: file, line: line)
+        XCTAssertEqual(session.webView.url, expected, file: file, line: line)
     }
 
     @MainActor

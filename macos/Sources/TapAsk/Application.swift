@@ -34,6 +34,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private(set) var currentSession: ProviderSession!
     private let defaults: UserDefaults
     private let websiteDataStore: WKWebsiteDataStore
+    private let retentionNow: () -> ContinuousClock.Instant
+    private var retentionPolicy = SessionRetentionPolicy()
+    private(set) var backgroundPageReleaseTask: Task<Void, Never>?
     private(set) var loginPopup: LoginPopup?
     private var hotKey: HotKey?
     private var statusItem: NSStatusItem?
@@ -44,12 +47,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     #endif
 
     init(catalog: ProviderCatalog? = nil, defaults: UserDefaults = .standard,
-         websiteDataStore: WKWebsiteDataStore = .default()) {
+         websiteDataStore: WKWebsiteDataStore = .default(),
+         retentionNow: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now }) {
         self.catalog = catalog
         self.defaults = defaults
         self.websiteDataStore = websiteDataStore
+        self.retentionNow = retentionNow
         super.init()
     }
+
+    deinit { backgroundPageReleaseTask?.cancel() }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let launchEvent = NSAppleEventManager.shared().currentAppleEvent
@@ -139,6 +146,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     private func presentPanel() {
+        releaseExpiredBackgroundPages()
         if currentSession.needsReloadOnDisplay { currentSession.prepareForDisplay() }
         if !panel.isVisible { panel.prepareForPresentation() }
         needsWebFocus = true
@@ -159,6 +167,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     func switchProvider(to provider: Provider) {
+        // Check before lookup: a delayed timer must not revive an expired cached page.
+        releaseExpiredBackgroundPages()
         if let currentSession, currentSession.policy.provider.id == provider.id {
             currentSession.prepareForDisplay()
             return
@@ -180,11 +190,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         panel.updateLoadState(session.loadState, providerName: session.policy.provider.name)
         if panel.isVisible, !NSApp.isHidden { panel.makeKeyAndOrderFront(nil) }
         panel.makeFirstResponder(session.webView)
+        let released = retentionPolicy.didDisplay(session.policy.provider.id, at: retentionNow())
+        releasePages(released, reason: "capacity")
+        scheduleBackgroundPageRelease()
         session.prepareForDisplay()
     }
 
     /// Termination releases both the visible page and the cached background pages.
     func removeAllSessions() {
+        backgroundPageReleaseTask?.cancel()
+        backgroundPageReleaseTask = nil
+        retentionPolicy.reset()
         for session in sessions.values { session.dispose() }
         panel?.makeFirstResponder(nil)
         panel?.contentView = nil
@@ -193,9 +209,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     @objc func releaseOtherProviderPages(_ sender: Any?) {
-        for (id, session) in sessions where id != currentSession.policy.provider.id {
+        releasePages(retentionPolicy.releaseBackgroundPages(), reason: "manual")
+        scheduleBackgroundPageRelease()
+    }
+
+    func releaseExpiredBackgroundPages() {
+        releasePages(retentionPolicy.expire(at: retentionNow()), reason: "timeout")
+        scheduleBackgroundPageRelease()
+    }
+
+    private func releasePages(_ providerIDs: [String], reason: String) {
+        for id in providerIDs {
+            guard let session = sessions.removeValue(forKey: id) else { continue }
             session.dispose()
-            sessions.removeValue(forKey: id)
+            AppLog.lifecycle.info("phase=page-release reason=\(reason, privacy: .public) provider=\(id, privacy: .public) sessions=\(self.sessions.count, privacy: .public)")
+        }
+    }
+
+    private func scheduleBackgroundPageRelease() {
+        backgroundPageReleaseTask?.cancel()
+        backgroundPageReleaseTask = nil
+        guard let deadline = retentionPolicy.nextExpiration else { return }
+        backgroundPageReleaseTask = Task { @MainActor [weak self] in
+            // ContinuousClock includes system sleep; cancellation is the only sleep error.
+            do { try await Task.sleep(until: deadline, clock: .continuous) }
+            catch { return }
+            guard !Task.isCancelled, let self else { return }
+            self.releaseExpiredBackgroundPages()
         }
     }
 

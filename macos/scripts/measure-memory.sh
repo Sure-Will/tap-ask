@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Read-only process inspection; only build/memory.csv is written.
 # Usage: scripts/measure-memory.sh TapAsk-Debug [label]
+# For active webpage load acceptance, not a zero-webpage app-only baseline.
 # Sum per-process phys_footprint ledgers, not RSS or a shared-region-deduplicated total.
 set -euo pipefail
 export LC_ALL=C
@@ -73,7 +74,8 @@ while read -r pid connected_at; do
     esac
 done <<< "$candidate_connections"
 if [[ ${#pids[@]} -eq 1 ]]; then
-    echo "No live WebKit processes found in this app's connection log; this sample covers the app only." >&2
+    echo "No live owned WebKit processes found; active webpage samples require WebKit; no CSV row appended." >&2
+    exit 1
 fi
 
 total_bytes=0
@@ -104,6 +106,12 @@ for index in "${!pids[@]}"; do
     total_bytes=$((total_bytes + bytes))
     process_count=$((process_count + 1))
 done
+
+# All discovered WebKit processes may have exited before their footprint was read.
+if [[ "$process_count" -eq 1 ]]; then
+    echo "No WebKit processes were measured; active webpage samples require WebKit; no CSV row appended." >&2
+    exit 1
+fi
 
 # Do not record a partial run after the app exits/restarts during a sample.
 if [[ "$(ps -p "$app_pid" -o lstart=)" != *"$app_start" ]]; then

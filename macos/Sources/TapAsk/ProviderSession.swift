@@ -35,9 +35,7 @@ final class ProviderSession {
         }
         webDelegate.onCommit = { [weak self] url in
             guard let self else { return }
-            if let page = LastPage.saved(from: url, policy: self.policy) {
-                self.defaults.set(page, forKey: self.lastPageKey)
-            }
+            self.savePage(url)
             self.onCommit?()
         }
         webDelegate.onProcessTermination = { [weak self] action in
@@ -50,6 +48,19 @@ final class ProviderSession {
     }
 
     private var lastPageKey: String { "LastPage.\(policy.provider.id)" }
+
+    private func savePage(_ url: URL?) {
+        if let page = LastPage.saved(from: url, policy: policy) {
+            defaults.set(page, forKey: lastPageKey)
+        }
+    }
+
+    /// Same-document navigation can change the conversation URL without didCommit.
+    /// Never snapshot a provisional navigation or a page lost to process termination.
+    func saveCurrentPage() {
+        guard loadState == .loaded, !webView.isLoading else { return }
+        savePage(webView.url)
+    }
 
     func loadInitialPage() {
         guard let page = LastPage.restored(from: defaults.string(forKey: lastPageKey), policy: policy) else {
@@ -83,6 +94,7 @@ final class ProviderSession {
 
     /// Release the page's connections without touching persistent website data or LastPage.
     func dispose() {
+        saveCurrentPage()
         webView.stopLoading()
         onLoadStateChange = nil
         onCommit = nil
