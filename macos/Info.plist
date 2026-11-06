@@ -10,10 +10,15 @@
     <key>CFBundleDisplayName</key><string>TapAsk</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>0.1.3</string>
-    <key>CFBundleVersion</key><string>4</string>
+    <key>CFBundleShortVersionString</key><string>0.1.4</string>
+    <key>CFBundleVersion</key><string>5</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
+    <key>SUFeedURL</key><string>https://github.com/Sure-Will/tap-ask/releases/latest/download/appcast.xml</string>
+    <key>SUPublicEDKey</key><string>xyeD5p6QhPxJYYLySKdIHKZaDHRCUnRolOGk+IgZQJs=</string>
+    <key>SUEnableAutomaticChecks</key><true/>
+    <key>SUAutomaticallyUpdate</key><true/>
+    <key>SUVerifyUpdateBeforeExtraction</key><true/>
 </dict>
 </plist>

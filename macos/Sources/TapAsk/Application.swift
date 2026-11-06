@@ -16,7 +16,11 @@ enum AppLog {
 enum TapAskApplication {
     @MainActor static func main() {
         let app = NSApplication.shared
+        #if DEBUG
         let delegate = AppDelegate()
+        #else
+        let delegate = AppDelegate(updater: AppUpdater())
+        #endif
         app.delegate = delegate
         withExtendedLifetime(delegate) { app.run() }
     }
@@ -33,6 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private(set) var sessions: [String: ProviderSession] = [:]
     private(set) var currentSession: ProviderSession!
     private let defaults: UserDefaults
+    private let updater: (any AppUpdating)?
     private let websiteDataStore: WKWebsiteDataStore
     private let retentionNow: () -> ContinuousClock.Instant
     private var retentionPolicy = SessionRetentionPolicy()
@@ -47,10 +52,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     #endif
 
     init(catalog: ProviderCatalog? = nil, defaults: UserDefaults = .standard,
+         updater: (any AppUpdating)? = nil,
          websiteDataStore: WKWebsiteDataStore = .default(),
          retentionNow: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now }) {
         self.catalog = catalog
         self.defaults = defaults
+        self.updater = updater
         self.websiteDataStore = websiteDataStore
         self.retentionNow = retentionNow
         super.init()
@@ -76,6 +83,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         switchProvider(to: provider)
         installMainMenu()
         installStatusItem()
+        startUpdater()
 
         #if !DEBUG
         registerLoginItemOnce()
@@ -337,7 +345,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         presentPanel()
     }
 
+    func startUpdater() { updater?.start() }
+
+    @objc func checkForUpdates(_ sender: Any?) { updater?.checkForUpdates() }
+
+    @objc func toggleAutomaticUpdates(_ sender: Any?) {
+        guard let updater else { return }
+        updater.automaticUpdatesEnabled.toggle()
+    }
+
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(checkForUpdates(_:)) {
+            if updater?.updateReadyToInstall == true {
+                menuItem.title = "检查更新…（退出时安装）"
+            } else if updater?.updateAvailable == true {
+                menuItem.title = "查看更新…"
+            } else {
+                menuItem.title = "检查更新…"
+            }
+            return updater?.canCheckForUpdates == true
+        } else if menuItem.action == #selector(toggleAutomaticUpdates(_:)) {
+            menuItem.state = updater?.automaticUpdatesEnabled == true ? .on : .off
+            return updater != nil
+        }
         if menuItem.action == #selector(selectProvider(_:)) {
             let provider = ProviderSelection.provider(at: menuItem.tag, in: orderedProviders)
             menuItem.state = provider?.id == currentSession.policy.provider.id ? .on : .off
@@ -383,7 +413,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         makeStatusMenu(isPanelVisible: panel.isVisible, providerItems: makeProviderMenuItems(), target: self,
                        toggleAction: #selector(togglePanelFromMenu(_:)),
                        orderAction: #selector(showProviderOrder(_:)), reloadAction: #selector(reloadProviderPage(_:)),
-                       releaseOthersAction: #selector(releaseOtherProviderPages(_:)))
+                       releaseOthersAction: #selector(releaseOtherProviderPages(_:)),
+                       checkUpdatesAction: #selector(checkForUpdates(_:)),
+                       automaticUpdatesAction: #selector(toggleAutomaticUpdates(_:)))
     }
 
     private func rebuildProviderMenus() {
@@ -494,6 +526,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private func installMainMenu() {
         let main = NSMenu()
         let appMenu = NSMenu(title: "TapAsk")
+        for item in makeUpdateMenuItems(target: self, checkAction: #selector(checkForUpdates(_:)),
+                                        automaticAction: #selector(toggleAutomaticUpdates(_:))) {
+            appMenu.addItem(item)
+        }
+        appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "退出 TapAsk", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         let editMenu = NSMenu(title: "Edit")
         editMenu.addItem(withTitle: "撤销", action: Selector(("undo:")), keyEquivalent: "z")

@@ -698,7 +698,8 @@ final class LifecycleTests: XCTestCase {
                                               target: owner, action: action)
             statusMenu = makeStatusMenu(isPanelVisible: true, providerItems: items, target: owner,
                                         toggleAction: action, orderAction: action, reloadAction: action,
-                                        releaseOthersAction: action)
+                                        releaseOthersAction: action, checkUpdatesAction: action,
+                                        automaticUpdatesAction: action)
             XCTAssertTrue(mainMenu.items.first?.target === owner)
             XCTAssertTrue(statusMenu?.items.first?.target === owner)
         }
@@ -708,7 +709,7 @@ final class LifecycleTests: XCTestCase {
         let targetItems = (mainMenu.items + status.items).filter {
             $0.action == #selector(LifecycleMenuTarget.performAction(_:))
         }
-        XCTAssertEqual(targetItems.count, providers.count * 2 + 4)
+        XCTAssertEqual(targetItems.count, providers.count * 2 + 6)
         for item in targetItems { XCTAssertNil(item.target) }
         withExtendedLifetime((mainMenu, status)) {}
     }

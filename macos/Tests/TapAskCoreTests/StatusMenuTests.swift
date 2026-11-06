@@ -17,14 +17,16 @@ final class StatusMenuTests: XCTestCase {
                                           target: target, action: select)
         let menu = makeStatusMenu(isPanelVisible: false, providerItems: items, target: target,
                                   toggleAction: toggle, orderAction: order, reloadAction: reload,
-                                  releaseOthersAction: releaseOthers)
+                                  releaseOthersAction: releaseOthers,
+                                  checkUpdatesAction: #selector(MenuActionTarget.checkForUpdates(_:)),
+                                  automaticUpdatesAction: #selector(MenuActionTarget.toggleAutomaticUpdates(_:)))
         XCTAssertEqual(menu.items.map { $0.isSeparatorItem ? "separator" : $0.title },
                        ["显示 TapAsk", "separator", "ChatGPT", "Claude", "Gemini", "DeepSeek", "Grok", "豆包",
                         "服务商排序…", "separator",
-                        "重新加载", "释放其他服务商页面", "separator", "退出 TapAsk"])
-        XCTAssertEqual(menu.items.map(\.keyEquivalent), [" ", "", "1", "2", "3", "4", "5", "6", "", "", "r", "", "", "q"])
+                        "重新加载", "释放其他服务商页面", "separator", "检查更新…", "自动更新", "separator", "退出 TapAsk"])
+        XCTAssertEqual(menu.items.map(\.keyEquivalent), [" ", "", "1", "2", "3", "4", "5", "6", "", "", "r", "", "", "", "", "", "q"])
         XCTAssertEqual(menu.items[0].keyEquivalentModifierMask, .option)
-        for index in [2, 3, 4, 5, 6, 7, 10, 13] { XCTAssertEqual(menu.items[index].keyEquivalentModifierMask, .command) }
+        for index in [2, 3, 4, 5, 6, 7, 10, 16] { XCTAssertEqual(menu.items[index].keyEquivalentModifierMask, .command) }
         for (index, item) in items.enumerated() {
             XCTAssertEqual(item.state, providers[index].id == "deepseek" ? .on : .off)
             XCTAssertEqual(item.tag, index + 1)
@@ -34,8 +36,10 @@ final class StatusMenuTests: XCTestCase {
         XCTAssertEqual(menu.items[8].action, order)
         XCTAssertEqual(menu.items[10].action, reload)
         XCTAssertEqual(menu.items[11].action, releaseOthers)
-        XCTAssertEqual(menu.items[13].action, #selector(NSApplication.terminate(_:)))
-        for index in [0, 2, 3, 4, 5, 6, 7, 8, 10, 11] { XCTAssertTrue(menu.items[index].target === target) }
+        XCTAssertEqual(menu.items[13].action, #selector(MenuActionTarget.checkForUpdates(_:)))
+        XCTAssertEqual(menu.items[14].action, #selector(MenuActionTarget.toggleAutomaticUpdates(_:)))
+        XCTAssertEqual(menu.items[16].action, #selector(NSApplication.terminate(_:)))
+        for index in [0, 2, 3, 4, 5, 6, 7, 8, 10, 11, 13, 14] { XCTAssertTrue(menu.items[index].target === target) }
     }
 
     @MainActor
@@ -52,7 +56,9 @@ final class StatusMenuTests: XCTestCase {
                                   toggleAction: #selector(MenuActionTarget.togglePanel(_:)),
                                   orderAction: #selector(MenuActionTarget.showProviderOrder(_:)),
                                   reloadAction: #selector(MenuActionTarget.reloadPage(_:)),
-                                  releaseOthersAction: #selector(MenuActionTarget.releaseOtherProviderPages(_:)))
+                                  releaseOthersAction: #selector(MenuActionTarget.releaseOtherProviderPages(_:)),
+                                  checkUpdatesAction: #selector(MenuActionTarget.checkForUpdates(_:)),
+                                  automaticUpdatesAction: #selector(MenuActionTarget.toggleAutomaticUpdates(_:)))
         XCTAssertEqual(menu.items.first?.title, "隐藏 TapAsk")
         XCTAssertEqual(menu.items[2].state, .on)
         XCTAssertEqual(menu.items[3].state, .off)
@@ -76,7 +82,9 @@ final class StatusMenuTests: XCTestCase {
                                         toggleAction: #selector(MenuActionTarget.togglePanel(_:)),
                                         orderAction: #selector(MenuActionTarget.showProviderOrder(_:)),
                                         reloadAction: #selector(MenuActionTarget.reloadPage(_:)),
-                                        releaseOthersAction: #selector(MenuActionTarget.releaseOtherProviderPages(_:)))
+                                        releaseOthersAction: #selector(MenuActionTarget.releaseOtherProviderPages(_:)),
+                                  checkUpdatesAction: #selector(MenuActionTarget.checkForUpdates(_:)),
+                                  automaticUpdatesAction: #selector(MenuActionTarget.toggleAutomaticUpdates(_:)))
         XCTAssertEqual(Array(statusMenu.items[2..<8]).map(\.title),
                        ["豆包", "DeepSeek", "Grok", "ChatGPT", "Claude", "Gemini"])
         for items in [mainItems, statusItems] {
@@ -100,6 +108,8 @@ final class StatusMenuTests: XCTestCase {
 
 @MainActor
 private final class MenuActionTarget: NSObject {
+    @objc func checkForUpdates(_ sender: Any?) {}
+    @objc func toggleAutomaticUpdates(_ sender: Any?) {}
     @objc func selectProvider(_ sender: NSMenuItem) {}
     @objc func togglePanel(_ sender: Any?) {}
     @objc func reloadPage(_ sender: Any?) {}

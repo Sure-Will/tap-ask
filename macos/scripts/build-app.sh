@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Assemble a universal (arm64 + x86_64) ad-hoc signed app from the SwiftPM release build. Never launches it.
+# Assemble a signed universal app. Never launches it.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -17,5 +17,12 @@ cp Info.plist "$APP/Contents/Info.plist"
 cp ../shared/providers.json "$APP/Contents/Resources/providers.json"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 plutil -lint "$APP/Contents/Info.plist"
-codesign --force --options runtime --sign - "$APP"
+IDENTITY="${CODE_SIGN_IDENTITY:--}"
+scripts/embed-sparkle.sh "$APP" "$IDENTITY"
+SIGN_OPTIONS=(--force --options runtime --sign "$IDENTITY")
+if [[ "$IDENTITY" == "-" ]]; then
+    SIGN_OPTIONS+=(--entitlements AdHoc.entitlements)
+fi
+codesign "${SIGN_OPTIONS[@]}" "$APP"
+codesign --verify --deep --strict "$APP"
 echo "Built $APP"
