@@ -21,16 +21,19 @@ func makeProviderMenuItems(providers: [Provider], currentProviderID: String,
 func makeStatusMenu(isPanelVisible: Bool, providerItems: [NSMenuItem], target: AnyObject,
                     toggleAction: Selector, orderAction: Selector, reloadAction: Selector,
                     releaseOthersAction: Selector, checkUpdatesAction: Selector,
-                    automaticUpdatesAction: Selector) -> NSMenu {
+                    automaticUpdatesAction: Selector, shortcut: GlobalShortcut,
+                    shortcutSettingsAction: Selector) -> NSMenu {
     let menu = NSMenu()
     let toggle = menu.addItem(withTitle: panelVisibilityMenuTitle(isVisible: isPanelVisible),
-                              action: toggleAction, keyEquivalent: " ")
+                              action: toggleAction, keyEquivalent: shortcut.keyEquivalent)
     toggle.target = target
-    toggle.keyEquivalentModifierMask = .option
+    toggle.keyEquivalentModifierMask = shortcut.modifiers.eventFlags
     menu.addItem(.separator())
     for item in providerItems { menu.addItem(item) }
     let order = menu.addItem(withTitle: "服务商排序…", action: orderAction, keyEquivalent: "")
     order.target = target
+    let settings = menu.addItem(withTitle: "快捷键设置…", action: shortcutSettingsAction, keyEquivalent: "")
+    settings.target = target
     menu.addItem(.separator())
     let reload = menu.addItem(withTitle: "重新加载", action: reloadAction, keyEquivalent: "r")
     reload.target = target

@@ -32,6 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var catalog: ProviderCatalog!
     private var orderedProviders: [Provider] = []
     private var providerOrderWindow: ProviderOrderWindowController?
+    private var shortcutSettingsWindow: ShortcutSettingsWindowController?
     private var providerMenu: NSMenu?
     private var statusMenu: NSMenu?
     private(set) var sessions: [String: ProviderSession] = [:]
@@ -43,7 +44,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var retentionPolicy = SessionRetentionPolicy()
     private(set) var backgroundPageReleaseTask: Task<Void, Never>?
     private(set) var loginPopup: LoginPopup?
-    private var hotKey: HotKey?
+    private lazy var shortcutController = GlobalShortcutController(defaults: defaults) { [weak self] shortcut in
+        try HotKey(shortcut: shortcut) { [weak self] in self?.togglePanel() }
+    }
     private var statusItem: NSStatusItem?
     private var hotKeyStartedAt: UInt64?
     private var needsWebFocus = false
@@ -90,15 +93,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         #endif
         var hotKeyUnavailable = false
         do {
-            hotKey = try HotKey { [weak self] in self?.togglePanel() }
+            try shortcutController.start()
         } catch {
             hotKeyUnavailable = true
             AppLog.hotkey.error("Hotkey registration failed: \(String(describing: error), privacy: .public)")
             #if !DEBUG
             NSApp.activate()
             let alert = NSAlert()
-            alert.messageText = "⌥空格 注册失败"
-            alert.informativeText = "请重新打开 TapAsk 后再试，当前仍可使用窗口。"
+            alert.messageText = "\(shortcutController.shortcut.displayString) 注册失败"
+            alert.informativeText = "仍可点击菜单栏图标呼出窗口，或在右键菜单的“快捷键设置…”中更换组合键。"
             alert.addButton(withTitle: "好")
             alert.runModal()
             #endif
@@ -136,7 +139,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         soakTask?.cancel()
         soakTask = nil
         #endif
-        hotKey?.unregister()
+        shortcutSettingsWindow?.onRecordingChange = nil
+        shortcutSettingsWindow?.close()
+        shortcutController.stop()
         closeLoginPopup(restoreFocus: false)
         removeAllSessions()
     }
@@ -415,7 +420,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                        orderAction: #selector(showProviderOrder(_:)), reloadAction: #selector(reloadProviderPage(_:)),
                        releaseOthersAction: #selector(releaseOtherProviderPages(_:)),
                        checkUpdatesAction: #selector(checkForUpdates(_:)),
-                       automaticUpdatesAction: #selector(toggleAutomaticUpdates(_:)))
+                       automaticUpdatesAction: #selector(toggleAutomaticUpdates(_:)),
+                       shortcut: shortcutController.shortcut, shortcutSettingsAction: #selector(showShortcutSettings(_:)))
     }
 
     private func rebuildProviderMenus() {
@@ -432,6 +438,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
         needsWebFocus = false
         providerOrderWindow?.present()
+    }
+
+    @objc private func showShortcutSettings(_ sender: Any?) {
+        if shortcutSettingsWindow == nil {
+            let controller = ShortcutSettingsWindowController(shortcut: shortcutController.shortcut)
+            controller.onRecordingChange = { [weak self] recording in
+                try self?.shortcutController.setRecording(recording)
+            }
+            controller.onSave = { [weak self] shortcut in
+                guard let self else { return }
+                try self.shortcutController.save(shortcut)
+                self.rebuildProviderMenus()
+            }
+            shortcutSettingsWindow = controller
+        }
+        needsWebFocus = false
+        shortcutSettingsWindow?.present(shortcut: shortcutController.shortcut)
     }
 
     private func saveProviderOrder(_ ids: [String]?) {
@@ -526,6 +549,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private func installMainMenu() {
         let main = NSMenu()
         let appMenu = NSMenu(title: "TapAsk")
+        let shortcuts = appMenu.addItem(withTitle: "快捷键设置…", action: #selector(showShortcutSettings(_:)), keyEquivalent: ",")
+        shortcuts.target = self
+        appMenu.addItem(.separator())
         for item in makeUpdateMenuItems(target: self, checkAction: #selector(checkForUpdates(_:)),
                                         automaticAction: #selector(toggleAutomaticUpdates(_:))) {
             appMenu.addItem(item)

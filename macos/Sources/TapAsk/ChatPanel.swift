@@ -4,6 +4,7 @@ import TapAskCore
 @MainActor
 final class ChatPanel: NSPanel, NSWindowDelegate {
     private static let frameKey = "PanelFrame"
+    private static let normalMinimumSize = NSSize(width: 360, height: 480)
     private let defaults: UserDefaults
     private var savedFrame: NSRect?
     private let pageContainer = NSView()
@@ -50,12 +51,12 @@ final class ChatPanel: NSPanel, NSWindowDelegate {
         animationBehavior = .none
         isReleasedWhenClosed = false
         isMovableByWindowBackground = false
-        minSize = NSSize(width: 360, height: 480)
+        minSize = Self.normalMinimumSize
         backgroundColor = .windowBackgroundColor
         setFrame(NSRect(x: 0, y: 0, width: 480, height: 720), display: false)
         if let text = defaults.string(forKey: Self.frameKey) {
             let saved = NSRectFromString(text)
-            if saved.width >= minSize.width, saved.height >= minSize.height,
+            if saved.width > 0, saved.height > 0,
                [saved.origin.x, saved.origin.y, saved.width, saved.height].allSatisfy({ $0.isFinite }) {
                 savedFrame = saved
                 setFrame(saved, display: false)
@@ -130,12 +131,17 @@ final class ChatPanel: NSPanel, NSWindowDelegate {
     func prepareForPresentation() {
         let mouse = NSEvent.mouseLocation
         guard let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? NSScreen.main else { return }
-        if let savedFrame, screen.frame.contains(NSPoint(x: savedFrame.midX, y: savedFrame.midY)) {
-            setFrame(savedFrame, display: false)
-        } else {
-            let visible = screen.visibleFrame
-            setFrameOrigin(NSPoint(x: visible.midX - frame.width / 2, y: visible.midY - frame.height / 2))
-        }
+        prepareForPresentation(screenFrame: screen.frame, visibleFrame: screen.visibleFrame)
+    }
+
+    func prepareForPresentation(screenFrame: NSRect, visibleFrame: NSRect) {
+        let fittedFrame = chatPanelFrame(currentFrame: frame, savedFrame: savedFrame,
+                                        screenFrame: screenFrame, visibleFrame: visibleFrame)
+        // AppKit's minimum must allow the same tiny-screen exception as the geometry.
+        // Restore the usual constraint on the next presentation on a larger display.
+        minSize = NSSize(width: min(Self.normalMinimumSize.width, visibleFrame.width),
+                         height: min(Self.normalMinimumSize.height, visibleFrame.height))
+        setFrame(fittedFrame, display: false)
         saveFrame()
     }
 
