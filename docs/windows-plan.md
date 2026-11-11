@@ -2,7 +2,7 @@
 
 写于 2026-11-11，基于 `main` 的 `db11e59`（Mac 0.1.5）。目标是做出与 Mac 0.1.5 功能对齐的 Windows 原生版。
 
-这是一份方案，不是进度记录。文中所有 Windows 行为都还没有实现，也没有在 Windows 上验证过。每个阶段做完后，以 `docs/behavior.md` 的 Windows 列和手动验收结果为准。
+这是一份开发方案。Windows 版已开始覆盖 W1–W5 的功能，当前实现和已知缺口以 `docs/behavior.md` 的 Windows 列为准；外链直接点击自动转交、真实登录、安装升级及系统场景仍需完成和验收，不能将各阶段视为全部通过。
 
 ## 已经定下的事
 
@@ -14,6 +14,8 @@
 - 不显示任务栏图标，不出现在 Alt+Tab 里，支持开机自启。
 - 在别的虚拟桌面呼出时，窗口出现在当前桌面，不把用户切走。
 - 名字写 `TapAsk`，不写全小写连写。
+- 两端首次启动、没有上次选择时默认打开 DeepSeek；已有有效选择仍然恢复，服务商排序不变。
+- Windows 0.1.6 先发布；Mac 0.1.6 验证后补到同一个 Release，在此之前保留 Mac 0.1.5 的更新清单和安装包。
 
 ## 要做什么
 
@@ -46,7 +48,7 @@
 | 自动更新 | Velopack | 见下文“自动更新” |
 | 全局快捷键 | Win32 `RegisterHotKey`，带 `MOD_NOREPEAT` | 不需要键盘钩子；被别的程序占用时注册会失败，可以如实提示 |
 
-需要的依赖一共三个：`Microsoft.Web.WebView2`、`xunit`（仅测试）、`Velopack`。根目录 `AGENTS.md` 规定“不加依赖”，目前只为 Mac 的 Sparkle 开了例外，所以 Windows 开工前要先在 `AGENTS.md` 里写明这三个是授权依赖。
+Windows 的授权依赖为 `Microsoft.Web.WebView2`、`xunit`（含测试运行器和 SDK，仅测试）、`Velopack`；根目录 `AGENTS.md` 已列明这些例外。
 
 ## 目录结构
 
@@ -113,10 +115,10 @@ WebView2 另外要关掉的默认行为：开发者工具、状态栏、浏览�
 - 建解决方案和三个项目，`verify.ps1` 能跑通。
 - `TapAsk.Core`：服务商目录、导航判定、页面记忆，258 个共享用例全部通过。
 - 程序：Alt+空格呼出和收起，置顶浮窗，不进任务栏和 Alt+Tab，托盘图标带“显示/隐藏”和“退出”，单实例（再次启动时显示已有窗口）。
-- 一个 WebView2，加载目录里的第一个服务商，登录状态退出重开后保留，导航规则生效，外链交默认浏览器。
+- 一个 WebView2，首次加载 DeepSeek，登录状态退出重开后保留，导航规则生效，外链交默认浏览器。
 - 按每台显示器 DPI 感知（Per-Monitor V2）。
 
-验收：从别的程序按 Alt+空格能直接打字、第一个字不丢；中文输入法候选框正常；再按一次收起，焦点回到原程序；连按 10 次状态不乱；ChatGPT 能登录且重开后仍登录；脚本跳外站被取消。
+验收：从别的程序按 Alt+空格能直接打字、第一个字不丢；中文输入法候选框正常；再按一次收起，焦点回到原程序；连按 10 次状态不乱；DeepSeek 能登录且重开后仍登录；脚本跳外站被取消。
 
 ### W2：六家服务商
 
@@ -152,9 +154,11 @@ WebView2 另外要关掉的默认行为：开发者工具、状态栏、浏览�
 ### W5：分发和自动更新
 
 - Velopack 打包，安装到 `%LocalAppData%`，不需要管理员权限。
-- 每天在后台检查并下载；下载好后调用 `WaitExitThenApplyUpdates`，等下次正常退出时安装，不主动重启。托盘菜单有“检查更新…”和“自动更新”开关。
+- 每天在后台检查并下载；仅在用户正常退出时调用 `WaitExitThenApplyUpdates` 安装，不主动重启。Velopack 的等待有 60 秒上限，不能在下载后立即调用，否则可能中断长时间聊天。托盘菜单有“检查更新…”和“自动更新”开关。
 - README 加 Windows 的下载、安装和首次运行放行说明；`docs/behavior.md` 的 Windows 列改成实际行为。
 - 加一个 GitHub Actions 工作流，在 Windows 环境跑 `verify.ps1`，这样在 Mac 这边改了 `shared/` 或文档也能知道 Windows 测试有没有坏。
+
+用户于 2026-11-11 允许 Velopack 的安装器、启动器和更新器在本机诊断日志中记录安装路径；更新源的日志不会写入网址或异常详情。源码运行版跳过更新组件初始化，安装版及 Velopack 便携版启用更新；实际安装与升级仍需验收。
 
 验收：装一个旧版本，发布一个新版本，旧版本后台下载、正常退出后装上新版本，登录数据和设置保留。
 
@@ -176,22 +180,21 @@ Mac 的行为是“后台下载，下次正常退出时安装，不打断聊天�
 ## 开发方式
 
 - **只在 Windows 那台机器上开发**，仓库在 `D:\Projects\tap-ask`。Mac 上没有 .NET SDK，也跑不了 WinForms 和 WebView2 的测试，所以 Mac 这边不改 `windows/` 下的代码。
-- 两端通过 `main` 同步。Windows 的改动只动 `windows/`、`docs/behavior.md` 的 Windows 列和 README 的 Windows 部分，与 Mac 的改动天然不冲突。
+- 两端通过 `main` 同步。Windows 实现主要放在 `windows/`，需要同步的行为写入 `docs/behavior.md` 和 README；本次两端首次默认服务商的共同修改也涉及 Mac 纯逻辑与测试。
 - `shared/` 仍然不改。Windows 发现需要新增允许主机时，和 Mac 一样要有真机日志作依据。
 - W1 开工时在根目录 `AGENTS.md` 里加一节 Windows 的构建和测试命令、授权依赖，以及“不调用脚本注入接口”在 WebView2 上的具体含义。
 
 ## Windows 机器上的准备
 
-以下都还没做，也没有核实过那台机器的现状。
+2026-11-11 在当前 Windows 机器已完成以下开发准备：
 
-1. 安装 .NET 10 SDK。
-2. 确认 WebView2 运行时已安装（Windows 11 自带）。
-3. 在 `D:\Projects\tap-ask` 拉取到最新的 `main`。
-4. 按本文 W1 开工。
+1. .NET 10 SDK 安装在仓库忽略的 `private/dotnet/`，未修改系统 PATH。
+2. 已确认 WebView2 Runtime 存在。
+3. 仓库位于 `D:\Projects\tap-ask`；本轮改动尚未提交或推送。
+4. 本机可生成 Velopack 安装包和便携包，发布状态以 GitHub Release 为准。
 
 不需要任何账号、密钥或付费服务。W5 用到的 GitHub Release 权限沿用现有的。
 
 ## 待你决定
 
-- **Windows 的版本号**：方案默认两端共用版本号，Windows 第一个可用版本直接跟当时的 Mac 版本号。如果你想让 Windows 从 0.1.0 单独起步，更新源的设计要跟着改，需要在 W5 之前说。
 - **与 Mac 后续功能的先后**：Mac 的下载和麦克风原本排在 Windows 之前。两条线在不同机器上，可以同时推进；本方案按“同时推进，Windows 对齐 0.1.5”写。

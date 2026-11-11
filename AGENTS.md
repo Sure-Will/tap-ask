@@ -9,15 +9,25 @@
 
 ## 不能做
 
-- 不向网页注入脚本：不用 `evaluateJavaScript`、`WKUserScript`，也不读取页面内容来判断登录结果。
+- 不向网页注入脚本：不用 `evaluateJavaScript`、`WKUserScript`、`ExecuteScriptAsync`、`AddScriptToExecuteOnDocumentCreatedAsync` 或 WebMessage，也不读取页面内容来判断登录结果。
 - 不放宽导航规则：不改 `NavigationPolicy` 的判断逻辑，不加后缀匹配。新增允许主机只能是精确主机，而且要有真机日志作依据，由任务单明确给出。
 - 不改 `shared/`，除非任务单写了可以改。
-- 不加依赖；已授权的自动更新依赖 Sparkle 2.10.1 除外。
+- 不加依赖；已授权的 Sparkle 2.10.1，以及 Windows 的 WebView2、xUnit（含测试运行器和 SDK）和 Velopack 除外。
 - 不提交、不推送、不切换分支。分支和提交由调度方负责。
 - 不改系统或其他 app 的设置；本机 TapAsk 更新按下面的约定执行。
-- 日志只记主机名、阶段和结果，不记完整 URL、路径、查询参数、令牌或网页标题。
+- TapAsk 日志只记主机名、阶段和结果，不记完整 URL、路径、查询参数、令牌或网页标题。用户于 2026-11-11 允许 Windows 的 Velopack 安装器、启动器和更新器在本机诊断日志中记录安装路径；该例外不包括网页地址或令牌。
 
 ## 构建和测试
+
+在 `windows/` 下：
+
+```powershell
+dotnet build
+dotnet test
+scripts/verify.ps1
+```
+
+Windows 开发使用 .NET 10 SDK；GUI、网页登录、输入法和快捷键仍需在 Windows 会话中实测。
 
 在 `macos/` 下：
 

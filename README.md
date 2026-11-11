@@ -2,7 +2,7 @@
 
 按 ⌥空格，AI 聊天浮窗出现在所有窗口之上；再按一次收起，焦点回到你原来的 app。呼出快捷键可自定义，下文的 ⌥空格 均指默认设置。
 
-支持 ChatGPT、Claude、Gemini、DeepSeek、Grok、豆包，用 ⌘1 到 ⌘6 切换。保留当前和最近使用的一家页面，短时间来回切换无需重新加载；打开第三家，或后台页面切走满 5 分钟后，会自动释放较久未用的页面。
+支持 ChatGPT、Claude、Gemini、DeepSeek、Grok、豆包，用 ⌘1 到 ⌘6 切换。Windows 首次使用默认打开 DeepSeek，Mac 会在后续更新中调整；之后恢复上次使用的服务商。保留当前和最近使用的一家页面，短时间来回切换无需重新加载；打开第三家，或后台页面切走满 5 分钟后，会自动释放较久未用的页面。
 
 ## 下载与安装
 
@@ -49,7 +49,7 @@
 
 如果呼出快捷键没有反应，可能是别的 app 也占用了这个组合键，可以从菜单栏打开“快捷键设置…”换一组。macOS 不保证报告所有跨 app 冲突，注册成功仍需实际按键确认。
 
-TapAsk 本身不收集、不上传任何数据，写进本机系统日志的只有主机名，不含完整网址。浮窗里只会打开当前服务商和常见登录页的网站，你点击的其他链接会用系统默认浏览器打开。
+TapAsk 本身不收集、不上传任何数据，导航日志只记主机名，不含完整网址。Mac 浮窗里只会打开当前服务商和常见登录页的网站，你点击的其他链接会用系统默认浏览器打开。
 
 ## 从源码构建
 
@@ -77,7 +77,26 @@ scripts/build-app.sh
 swift test --disable-sandbox --skip 'NavigationDelegateTests|ChatPanelTests|ProviderOrderWindowTests'
 ```
 
-Windows 版还在计划中，方案见 [docs/windows-plan.md](docs/windows-plan.md)。
+Windows 版支持六家服务商，默认 Alt+空格呼出或收起，Ctrl+1 到 Ctrl+6 切换，Ctrl+R 刷新，Ctrl+, 打开快捷键设置。托盘菜单还提供服务商排序、释放后台页面及更新设置；首次使用默认打开 DeepSeek。可以右键符合导航规则的外链，选择“在默认浏览器中打开”；直接点击外链暂不自动转交。Windows 版尚在验收中，真实账号登录、跨屏和安装升级等还需实机验证。开发方案见 [docs/windows-plan.md](docs/windows-plan.md)。
+
+Windows x64 用户可从 [Releases](https://github.com/Sure-Will/tap-ask/releases) 下载 `TapAsk-win-Setup.exe` 安装，也可以下载 `TapAsk-win-Portable.zip` 解压后运行其中的 `TapAsk.exe`。安装版和便携版都需要 WebView2 Runtime，安装包尚未进行 Windows 代码签名。
+
+开发构建需要 Windows x64、.NET 10 SDK 和 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)。在 Windows 上运行（脚本也会查找 `private/dotnet/` 下的 SDK）：
+
+```powershell
+cd windows
+.\scripts\verify.ps1
+```
+
+`verify.ps1` 会构建、测试并生成自包含的 x64 目录 `windows/build/app/`。如果程序正在运行，可运行 `.\scripts\verify.ps1 -OutputDirectory "$PWD\build\verify"` 将产物写到另一个目录。
+
+本地打包需要 Velopack 的 `vpk` 1.2.161，可将工具安装到仓库内的 `private/vpk/` 或放在 PATH 中。以下命令只生成本地产物，不上传或发布：
+
+```powershell
+.\scripts\pack.ps1 -Version 0.1.6
+```
+
+产物位于 `windows/build/releases/`，包括 `TapAsk-win-Setup.exe`、便携版、Windows 更新清单和更新包。Velopack 的本机诊断日志可能记录安装路径，用户已允许此例外。真实账号、安装升级和开机自启仍需实机验收。
 
 ## 许可证
 

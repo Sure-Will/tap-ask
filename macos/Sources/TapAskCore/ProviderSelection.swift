@@ -1,5 +1,8 @@
 public enum ProviderSelection {
     public static func restored(in providers: [Provider], savedID: String?) -> Provider? {
+        if savedID == nil {
+            return providers.first(where: { $0.id == "deepseek" }) ?? providers.first
+        }
         if let savedID, !savedID.isEmpty,
            let provider = providers.first(where: { $0.id == savedID }) {
             return provider

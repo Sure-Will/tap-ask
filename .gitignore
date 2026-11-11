@@ -1,3 +1,9 @@
 macos/.build/
 macos/build/
+windows/**/bin/
+windows/**/obj/
+windows/build/
+windows/**/*.user
+windows/.vs/
+private/
 .DS_Store

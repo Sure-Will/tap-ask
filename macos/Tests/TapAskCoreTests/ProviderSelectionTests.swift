@@ -8,9 +8,17 @@ final class ProviderSelectionTests: XCTestCase {
         XCTAssertEqual(ProviderSelection.restored(in: providers, savedID: "chatgpt")?.id, "chatgpt")
     }
 
-    func testMissingInvalidAndEmptySavedIDsUseFirstProvider() throws {
+    func testFirstLaunchDefaultsToDeepSeekRegardlessOfOrder() throws {
         let providers = try SharedFixtures.catalog().providers
-        for savedID: String? in [nil, "", "removed-provider"] {
+        XCTAssertEqual(ProviderSelection.restored(in: providers, savedID: nil)?.id, "deepseek")
+        XCTAssertEqual(ProviderSelection.restored(in: Array(providers.reversed()), savedID: nil)?.id, "deepseek")
+        XCTAssertEqual(ProviderSelection.restored(in: providers.filter { $0.id != "deepseek" }, savedID: nil)?.id,
+                       "chatgpt")
+    }
+
+    func testInvalidAndEmptySavedIDsUseFirstProvider() throws {
+        let providers = try SharedFixtures.catalog().providers
+        for savedID: String? in ["", "removed-provider"] {
             XCTAssertEqual(ProviderSelection.restored(in: providers, savedID: savedID)?.id, "chatgpt")
         }
     }
@@ -36,7 +44,8 @@ final class ProviderSelectionTests: XCTestCase {
 
     func testCustomOrderControlsFallbackAndNumberedSelection() throws {
         let providers = ProviderOrder.ordered(try SharedFixtures.catalog().providers, savedIDs: ["grok", "deepseek"])
-        for savedID: String? in [nil, "", "removed-provider"] {
+        XCTAssertEqual(ProviderSelection.restored(in: providers, savedID: nil)?.id, "deepseek")
+        for savedID: String? in ["", "removed-provider"] {
             XCTAssertEqual(ProviderSelection.restored(in: providers, savedID: savedID)?.id, "grok")
         }
         XCTAssertEqual(ProviderSelection.restored(in: providers, savedID: "claude")?.id, "claude")
