@@ -77,7 +77,7 @@ scripts/build-app.sh
 swift test --disable-sandbox --skip 'NavigationDelegateTests|ChatPanelTests|ProviderOrderWindowTests'
 ```
 
-Windows 版还在计划中。
+Windows 版还在计划中，方案见 [docs/windows-plan.md](docs/windows-plan.md)。
 
 ## 许可证
 
