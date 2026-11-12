@@ -1,102 +1,114 @@
-# TapAsk
+<div align="center">
+  <img src="docs/images/tapask-icon.png" width="112" alt="TapAsk 图标">
+  <h1>TapAsk</h1>
+  <p><strong>把常用 AI 放进一个随手呼出的浮窗。</strong></p>
+  <p>需要时打开，问完后收起，继续手头的事。</p>
+  <p>ChatGPT · Claude · Gemini · DeepSeek · Grok · 豆包</p>
+  <p>
+    <a href="https://github.com/Sure-Will/tap-ask/releases/download/v0.1.6/TapAsk-0.1.6-macOS.dmg"><strong>下载 macOS</strong></a> ·
+    <a href="https://github.com/Sure-Will/tap-ask/releases/download/v0.1.6/TapAsk-win-Setup.exe"><strong>下载 Windows</strong></a> ·
+    <a href="https://github.com/Sure-Will/tap-ask/releases/download/v0.1.6/TapAsk-win-Portable.zip">Windows 便携版</a>
+  </p>
+  <p>当前下载为 0.1.6 · <a href="https://github.com/Sure-Will/tap-ask/releases">查看所有版本</a></p>
+</div>
 
-按 ⌥空格，AI 聊天浮窗出现在所有窗口之上；再按一次收起，焦点回到你原来的 app。呼出快捷键可自定义，下文的 ⌥空格 均指默认设置。
+## TapAsk 能做什么
 
-支持 ChatGPT、Claude、Gemini、DeepSeek、Grok、豆包，用 ⌘1 到 ⌘6 切换。Windows 首次使用默认打开 DeepSeek，Mac 会在后续更新中调整；之后恢复上次使用的服务商。保留当前和最近使用的一家页面，短时间来回切换无需重新加载；打开第三家，或后台页面切走满 5 分钟后，会自动释放较久未用的页面。
+TapAsk 把六家 AI 网站放在同一个小窗口里。你可以在写代码、读文档或处理其他事情时打开它，问完再回到原来的窗口。
+
+- **快捷呼出**：按快捷键显示或收起浮窗，也可以点击菜单栏或系统托盘图标。呼出快捷键可以自己改。
+- **切换六家服务商**：在 ChatGPT、Claude、Gemini、DeepSeek、Grok 和豆包之间切换，还可以调整顺序。第一次打开默认进入 DeepSeek，以后恢复上次使用的服务商。
+- **接着上次聊**：各家网站的登录状态保存在本机，重新打开时尝试恢复上次停留的页面。最近使用的后台页面会暂时保留。
+- **放在顺手的位置**：窗口可以置顶、拖动和缩放，记住大小与位置；呼出时会根据鼠标所在的屏幕调整位置。
+- **后台更新**：发布版默认检查并下载更新，在下次正常退出 TapAsk 时安装，不主动打断聊天。
 
 ## 下载与安装
 
-要求 macOS 14 或更高版本，Apple 芯片和 Intel 芯片都能用。
+| 平台 | 下载 | 系统要求 |
+| --- | --- | --- |
+| macOS | [通用安装包](https://github.com/Sure-Will/tap-ask/releases/download/v0.1.6/TapAsk-0.1.6-macOS.dmg) | macOS 14 或更高版本，支持 Apple 芯片和 Intel |
+| Windows | [安装版](https://github.com/Sure-Will/tap-ask/releases/download/v0.1.6/TapAsk-win-Setup.exe) · [便携版](https://github.com/Sure-Will/tap-ask/releases/download/v0.1.6/TapAsk-win-Portable.zip) | Windows x64，需要 WebView2 Runtime |
 
-1. 从 [Releases](https://github.com/Sure-Will/tap-ask/releases) 下载 `TapAsk-<版本>-macOS.dmg`，双击打开。
-2. 在打开的窗口里，把 `TapAsk.app` 拖到“应用程序”。
-3. 双击打开。TapAsk 还没有经过 Apple 公证，第一次打开会被 macOS 拦下，提示无法验证它是否安全。被拦下之后，用下面任一方法放行：
-   - 打开 系统设置 › 隐私与安全性，在页面下方找到 TapAsk，点“仍要打开”；
-   - 或者在终端里运行：
+### macOS
 
-     ```bash
-     xattr -dr com.apple.quarantine /Applications/TapAsk.app
-     ```
+打开下载的 DMG，把 `TapAsk.app` 拖进“应用程序”，然后打开。TapAsk 会出现在菜单栏，单击图标显示或收起浮窗，右键打开菜单；Dock 中不显示图标。
 
-装进“应用程序”文件夹后第一次打开，TapAsk 会把自己加为登录项，开机后在后台准备好，菜单栏图标常驻，Dock 里没有图标。不想开机启动，可以在 系统设置 › 通用 › 登录项 里关掉。
+第一次从“应用程序”打开时，TapAsk 会尝试将自己加为登录项。如果不需要，可以在“系统设置 › 通用 › 登录项”中关闭。
 
-## 使用
+<details>
+<summary>第一次打开时被 macOS 拦下？</summary>
 
-| 操作 | 作用 |
-|---|---|
-| ⌥空格 | 呼出或收起浮窗 |
-| ⌘1 到 ⌘6 | 切换服务商 |
-| ⌘R | 重新加载当前页面 |
-| ⌘, | 打开快捷键设置（浮窗在前台时） |
-| 左键单击菜单栏图标 | 呼出或收起浮窗 |
-| 右键单击菜单栏图标 | 打开菜单：切换服务商、服务商排序、快捷键设置、重新加载、检查更新、自动更新、退出 |
+TapAsk 尚未经过 Apple 公证。被拦下后，在“系统设置 › 隐私与安全性”中找到 TapAsk，选择“仍要打开”；也可以在终端运行：
 
-在右键菜单的“服务商排序…”里拖动整行，或者选中一行按 ⌥↑ / ⌥↓，就能调整顺序，⌘ 编号会跟着变，“恢复默认”回到初始顺序。
+```bash
+xattr -dr com.apple.quarantine /Applications/TapAsk.app
+```
 
-在右键菜单的“快捷键设置…”里点按当前组合键，然后按下新的组合键并“保存”，立即生效且下次启动仍保留。组合键须包含 ⌘、⌥ 或 ⌃，可加 ⇧；TapAsk 已使用的编辑、切换服务商等快捷键不能占用。录制时 Esc 取消本次录制；“取消”或关闭窗口放弃未保存的修改。“恢复默认”选回 ⌥空格，再点“保存”生效。注册失败会显示原因并保留原设置，菜单中的呼出快捷键随保存结果更新。
+</details>
 
-网页铺到浮窗最上沿，顶部中央悬浮一根短白条，没有独立底色或分隔线。鼠标移到白条及周围留白时显示手形光标，可以从这里拖动窗口；其余顶部区域的点击仍交给网页。拖动边缘可以调整大小，位置和大小下次打开还在。
+### Windows
 
-从隐藏状态呼出时，窗口跟随鼠标所在屏幕：原位置在该屏幕则尽量保留，换屏则居中；窗口过大时缩小，越界时移回屏幕可用区域，避开菜单栏和 Dock。拖动和缩放过程中不会自动跳位。
+运行安装版，或者将便携版解压到固定位置，双击其中的 `TapAsk.exe`。两种版本都需要 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)。
 
-每家服务商都直接在浮窗里登录，登录状态保存在本机。重新打开时，会恢复各家上次停留的页面；服务商自家页面请求新窗口时，页面仍在主浮窗里打开。跳到 Google 等外部登录页时，浮窗顶部会显示当前所在的网站。网络不通时，浮窗会显示失败原因和“重试”按钮，切回加载失败的服务商也会自动重新加载。
+运行后，在任务栏右侧的系统托盘找到 TapAsk 图标。单击显示或收起浮窗，右键打开菜单；图标不在外面时，可以查看托盘的隐藏图标。
 
-自动释放不清除登录数据，切回时会重新加载上次的对话地址；未发送草稿、滚动位置和正在生成的回答可能丢失或中断。当前页面即使收起浮窗也会保留，登录弹窗不受自动释放影响。也可以在右键菜单选择“释放其他服务商页面”立即释放后台页。
+安装包尚未进行 Windows 代码签名，系统可能提示发布者未知。Windows 版的真实账号登录、跨屏和安装升级等场景仍需进一步实机验收。
 
-自动更新默认开启，每天在后台检查并下载新版本，下载就绪后在下次正常退出 TapAsk 时安装，不主动中断聊天或重启。收起浮窗只会隐藏窗口，不会退出或安装更新。后台更新提醒显示在菜单里，不弹窗抢焦点；主动选择“检查更新…”会打开 Sparkle 的更新界面，也可以立即安装并重启。菜单里的“自动更新”可关闭后台检查和下载，选择在下次启动后仍然有效。更新保留本机登录数据、服务商顺序和窗口偏好，网页内未发送草稿等内存状态不保证在重启后恢复。
+## 怎么用
 
-自动更新从 0.1.4 开始提供，0.1.3 及更早版本需要先手动替换一次。当前账户没有权限替换应用时，更新需要管理员授权。
+| 操作 | macOS | Windows |
+| --- | --- | --- |
+| 显示或收起浮窗 | ⌥空格 | Alt+空格 |
+| 切换第 1 到第 6 个服务商 | ⌘1 到 ⌘6 | Ctrl+1 到 Ctrl+6 |
+| 重新加载当前页面 | ⌘R | Ctrl+R |
+| 打开快捷键设置（浮窗在前台时） | ⌘, | Ctrl+, |
 
-如果呼出快捷键没有反应，可能是别的 app 也占用了这个组合键，可以从菜单栏打开“快捷键设置…”换一组。macOS 不保证报告所有跨 app 冲突，注册成功仍需实际按键确认。
+表中显示默认的呼出快捷键。服务商编号随菜单中的排序变化；你也可以右键菜单栏或托盘图标，选择服务商、调整排序、修改快捷键和检查更新。
 
-TapAsk 本身不收集、不上传任何数据，导航日志只记主机名，不含完整网址。Mac 浮窗里只会打开当前服务商和常见登录页的网站，你点击的其他链接会用系统默认浏览器打开。
+拖动浮窗顶部中央的短白条可以移动窗口，拖动边缘可以调整大小。
+
+## 常见问题
+
+**快捷键没有反应怎么办？**
+
+先确认 TapAsk 正在运行，再单击菜单栏或托盘图标打开浮窗。右键图标进入“快捷键设置…”可以换一组。macOS 组合键须包含 ⌘、⌥ 或 ⌃，Windows 须包含 Ctrl 或 Alt；都可以加 Shift。注册失败时会保留原设置；系统不一定能报告所有冲突，保存后请实际按键确认。
+
+**收起浮窗和退出有什么区别？**
+
+收起后 TapAsk 仍在运行，当前页面会保留。要完全退出，请在菜单栏或托盘的右键菜单中选择“退出 TapAsk”。发布版默认每天在后台检查更新，下载好的更新会在正常退出后安装；收起浮窗不会触发安装。更新会保留登录数据、服务商顺序和窗口偏好，但不保证保留未发送的网页草稿。
+
+macOS 上也可以从菜单选择“检查更新…”，立即安装并重启。Mac 版 0.1.3 及更早版本需要先手动替换一次，之后才能使用自动更新。
+
+**切换服务商后，页面会一直留在后台吗？**
+
+TapAsk 最多保留当前和最近使用的一家页面。打开第三家，或后台页面闲置满 5 分钟后，较久未用的页面会被释放，切回时重新加载。登录数据不会因此清除，但未发送的草稿、滚动位置或正在生成的回答可能丢失或中断。登录弹窗不受自动释放影响；也可以从菜单中手动释放其他服务商页面。
+
+**账号和聊天内容在哪里？**
+
+登录和对话都通过你选择的服务商网页进行，TapAsk 不收集聊天内容或账号资料。导航日志记录服务商、主机名、阶段和结果，不记录完整网址或网页标题；Windows 更新组件的本机诊断日志可能记录安装路径。
+
+**外部链接和文件下载能用吗？**
+
+macOS 上，用户点击的合规外部链接会交给默认浏览器。Windows 上可以右键符合导航规则的外链，选择“在默认浏览器中打开”；直接点击暂不会自动转交。浮窗内的文件下载暂不可用。
 
 ## 从源码构建
 
-需要 Xcode Command Line Tools（Swift 6）。自动更新使用 [Sparkle 2.10.1](https://github.com/sparkle-project/Sparkle/releases/tag/2.10.1)，由 Swift Package Manager 获取。
+macOS 需要 Xcode Command Line Tools（Swift 6）；Windows 需要 .NET 10 SDK 和 WebView2 Runtime。
 
 ```bash
+# macOS
 cd macos
 swift test --disable-sandbox
 scripts/build-app.sh
 ```
 
-产物是 `macos/build/TapAsk.app`，同时包含 arm64 和 x86_64。`CODE_SIGN_IDENTITY` 指定签名身份，默认 `-`，沿用 ad-hoc 本机分发；此时主 app 的 Hardened Runtime 签名附带 `disable-library-validation` entitlement，以加载 Sparkle。使用证书签名时不添加这个 entitlement。目前没有 Developer ID 签名或 Apple 公证，更新包通过 Ed25519 签名验证，并在解包前验证。服务商列表在 `shared/providers.json`，导航规则的测试用例在 `shared/policy-cases.json`，行为约定和手工验收清单见 [docs/behavior.md](docs/behavior.md)。
-
-在 `macos/` 下运行 `scripts/make-dmg.sh` 会先构建 app，再生成并校验 `build/TapAsk-<版本>-macOS.dmg`。打包使用系统自带的 `hdiutil`，不需要额外依赖。
-
-发布更新前，在 `macos/Info.plist` 中递增 `CFBundleVersion`，并更新展示版本 `CFBundleShortVersionString`。Sparkle 的 Ed25519 私钥保存在登录钥匙串，账号为 `io.github.sure-will.tap-ask.updates`，公钥写入 app 的 `SUPublicEDKey`；私钥不进入仓库。沿用已有密钥，备份后妥善保存，丢失私钥会影响已有安装的后续更新。
-
-在 `macos/` 下运行 `scripts/prepare-update.sh`，会调用 `make-dmg.sh`、签名 DMG，并在 `build/updates/` 生成 `appcast.xml`、DMG 和 SHA-256 校验文件。脚本只准备本地产物，不上传或发布。更新源固定为 [最新正式 Release 的 appcast](https://github.com/Sure-Will/tap-ask/releases/latest/download/appcast.xml)。每次正式 Release 都要附带同一批生成的 appcast、DMG 和 SHA-256 文件；先上传完整草稿并核对附件，再发布并设为 Latest，避免更新源指向缺少附件的版本。签名后不要再修改 DMG。
-
-菜单栏图标和 App 图标的图形都定义在 `macos/Sources/TapAskCore/BrandMark.swift`，改动后运行 `scripts/make-icons.sh` 重新生成 App 图标。
-
-`ChatPanelTests`、`NavigationDelegateTests`、`ProviderOrderWindowTests` 需要能打开窗口、启动 WebKit 的正常 macOS 会话，在沙盒里可以先跳过：
-
-```bash
-swift test --disable-sandbox --skip 'NavigationDelegateTests|ChatPanelTests|ProviderOrderWindowTests'
-```
-
-Windows 版支持六家服务商，默认 Alt+空格呼出或收起，Ctrl+1 到 Ctrl+6 切换，Ctrl+R 刷新，Ctrl+, 打开快捷键设置。托盘菜单还提供服务商排序、释放后台页面及更新设置；首次使用默认打开 DeepSeek。可以右键符合导航规则的外链，选择“在默认浏览器中打开”；直接点击外链暂不自动转交。Windows 版尚在验收中，真实账号登录、跨屏和安装升级等还需实机验证。开发方案见 [docs/windows-plan.md](docs/windows-plan.md)。
-
-Windows x64 用户可从 [Releases](https://github.com/Sure-Will/tap-ask/releases) 下载 `TapAsk-win-Setup.exe` 安装，也可以下载 `TapAsk-win-Portable.zip` 解压后运行其中的 `TapAsk.exe`。安装版和便携版都需要 WebView2 Runtime，安装包尚未进行 Windows 代码签名。
-
-开发构建需要 Windows x64、.NET 10 SDK 和 [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)。在 Windows 上运行（脚本也会查找 `private/dotnet/` 下的 SDK）：
-
 ```powershell
+# Windows
 cd windows
 .\scripts\verify.ps1
 ```
 
-`verify.ps1` 会构建、测试并生成自包含的 x64 目录 `windows/build/app/`。如果程序正在运行，可运行 `.\scripts\verify.ps1 -OutputDirectory "$PWD\build\verify"` 将产物写到另一个目录。
-
-本地打包需要 Velopack 的 `vpk` 1.2.161，可将工具安装到仓库内的 `private/vpk/` 或放在 PATH 中。以下命令只生成本地产物，不上传或发布：
-
-```powershell
-.\scripts\pack.ps1 -Version 0.1.6
-```
-
-产物位于 `windows/build/releases/`，包括 `TapAsk-win-Setup.exe`、便携版、Windows 更新清单和更新包。Velopack 的本机诊断日志可能记录安装路径，用户已允许此例外。真实账号、安装升级和开机自启仍需实机验收。
+构建、测试、签名和打包的完整说明见 [开发与发布](docs/development.md)。产品行为和手工验收清单见 [行为约定](docs/behavior.md)。
 
 ## 许可证
 
