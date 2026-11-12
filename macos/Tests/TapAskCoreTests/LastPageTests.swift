@@ -3,6 +3,22 @@ import TapAskCore
 import XCTest
 
 final class LastPageTests: XCTestCase {
+    func testHomeHostLoginPathsAreNotSavedOrRestored() throws {
+        let catalog = try SharedFixtures.catalog()
+        for (id, value) in [("claude", "https://claude.ai/login"),
+                            ("deepseek", "https://chat.deepseek.com/sign_in"),
+                            ("chatgpt", "https://chatgpt.com/auth/login")] {
+            let policy = try SharedFixtures.policy(for: id, in: catalog)
+            XCTAssertNil(LastPage.saved(from: URL(string: value), policy: policy), value)
+            XCTAssertNil(LastPage.restored(from: value, policy: policy), value)
+        }
+        let claude = try SharedFixtures.policy(for: "claude", in: catalog)
+        XCTAssertEqual(LastPage.saved(from: URL(string: "https://claude.ai/chat/login"), policy: claude),
+                       "https://claude.ai/chat/login")
+        XCTAssertEqual(LastPage.saved(from: URL(string: "https://claude.ai/?token=secret#fragment"), policy: claude),
+                       "https://claude.ai/")
+    }
+
     func testSavesEachHomeHostWithoutQueryOrFragment() throws {
         let catalog = try SharedFixtures.catalog()
         for provider in catalog.providers {

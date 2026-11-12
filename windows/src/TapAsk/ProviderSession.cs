@@ -50,6 +50,7 @@ internal sealed class ProviderSession : IDisposable
             await View.EnsureCoreWebView2Async(environment);
             if (disposed) return;
             var core = View.CoreWebView2;
+            SetMemoryTarget(owner.Visible);
             core.Settings.AreDevToolsEnabled = false;
             core.Settings.IsStatusBarEnabled = false;
             core.Settings.AreBrowserAcceleratorKeysEnabled = false;
@@ -153,6 +154,18 @@ internal sealed class ProviderSession : IDisposable
     public void PrepareForDisplay()
     {
         if (NeedsReload || Failure is not null) Reload();
+    }
+
+    public void SetMemoryTarget(bool visible)
+    {
+        if (disposed) return;
+        try
+        {
+            if (View.CoreWebView2 is { } core)
+                core.MemoryUsageTargetLevel = visible ? CoreWebView2MemoryUsageTargetLevel.Normal : CoreWebView2MemoryUsageTargetLevel.Low;
+        }
+        catch (System.Runtime.InteropServices.COMException)
+        { NavigationLog.Write(Provider.Id, "memory-target", null, "failed"); }
     }
 
     public void CheckTimeout(TimeSpan now)

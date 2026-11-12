@@ -2,69 +2,72 @@ import AppKit
 import Sparkle
 import WebKit
 import XCTest
+import TapAskCore
 @testable import TapAsk
 
 final class AppUpdaterTests: XCTestCase {
     @MainActor
-    func testConstructionDoesNotStartAndActionsRouteToInjectedUpdater() {
+    func testIdleUpdateWaitsForLoginPopupToClose() throws {
+        _ = NSApplication.shared
+        let catalog = try SharedFixtures.catalog()
+        let updater = FakeAppUpdater()
+        updater.preparedUpdateVersion = "99"
+        let suite = "TapAsk.IdleUpdateTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var now = ContinuousClock.now
+        let owner = AppDelegate(catalog: catalog, defaults: defaults, updater: updater, websiteDataStore: .nonPersistent(),
+                                retentionNow: { now })
+        owner.configurePanel()
+        defer { owner.closeLoginPopup(restoreFocus: false); owner.removeAllSessions(); owner.panel.orderOut(nil) }
+        let session = owner.makeSession(for: catalog.providers[0])
+        owner.displaySession(session)
+        let configuration = WKWebViewConfiguration()
+        configuration.websiteDataStore = .nonPersistent()
+        _ = owner.openLoginPopup(configuration: configuration, policy: session.policy, initialURL: nil)
+        owner.panel.onCancel?()
+        now = now.advanced(by: .seconds(1_800))
+        owner.releaseIdleCurrentPageIfNeeded()
+        XCTAssertNil(owner.currentSession)
+        XCTAssertNotNil(owner.loginPopup)
+        updater.updateReadyToInstall = true
+        updater.onReadyToInstall?()
+        XCTAssertEqual(updater.installCount, 0)
+        owner.closeLoginPopup(restoreFocus: false)
+        XCTAssertEqual(updater.installCount, 1)
+        XCTAssertTrue(IdleUpdateRelaunch.consume(currentVersion: "99", defaults: defaults))
+        updater.onReadyToInstall?()
+        XCTAssertEqual(updater.installCount, 1)
+    }
+    @MainActor
+    func testSettingsControlsRouteToInjectedUpdater() throws {
+        _ = NSApplication.shared
         let updater = FakeAppUpdater()
         let owner = AppDelegate(updater: updater, websiteDataStore: .nonPersistent())
         XCTAssertEqual(updater.startCount, 0)
-        XCTAssertEqual(updater.checkCount, 0)
         owner.startUpdater()
         XCTAssertEqual(updater.startCount, 1)
-        owner.checkForUpdates(nil)
-        XCTAssertEqual(updater.checkCount, 1)
-        owner.toggleAutomaticUpdates(nil)
-        XCTAssertTrue(updater.automaticUpdatesEnabled)
-        owner.toggleAutomaticUpdates(nil)
-        XCTAssertFalse(updater.automaticUpdatesEnabled)
-    }
-
-    @MainActor
-    func testMenuValidationReflectsBusyAutomaticAndReadyState() {
-        let updater = FakeAppUpdater()
-        let owner = AppDelegate(updater: updater, websiteDataStore: .nonPersistent())
-        let items = updateItems(owner)
-        XCTAssertFalse(owner.validateMenuItem(items[0]))
-        XCTAssertEqual(items[0].title, "检查更新…")
-        XCTAssertTrue(owner.validateMenuItem(items[1]))
-        XCTAssertEqual(items[1].state, .off)
-        updater.updateAvailable = true
-        XCTAssertFalse(owner.validateMenuItem(items[0]), "Background downloads must still respect Sparkle canCheckForUpdates")
-        XCTAssertEqual(items[0].title, "查看更新…")
         updater.canCheckForUpdates = true
-        XCTAssertTrue(owner.validateMenuItem(items[0]), "A resumable reminder uses Sparkle's standard check action")
-        updater.updateAvailable = false
-        updater.automaticUpdatesEnabled = true
+        let view = SettingsGeneralView(updater: updater, defaults: .standard)
+        let buttons = view.subviews.compactMap { $0 as? NSButton }
+        let automatic = try XCTUnwrap(buttons.first { $0.title == "自动检查并下载更新" })
+        let check = try XCTUnwrap(buttons.first { $0.title == "检查更新…" })
+        automatic.performClick(nil)
+        XCTAssertTrue(updater.automaticUpdatesEnabled)
+        check.performClick(nil)
+        XCTAssertEqual(updater.checkCount, 1)
         updater.updateReadyToInstall = true
-        XCTAssertTrue(owner.validateMenuItem(items[0]))
-        XCTAssertEqual(items[0].title, "检查更新…（退出时安装）")
-        XCTAssertTrue(owner.validateMenuItem(items[1]))
-        XCTAssertEqual(items[1].state, .on)
-        updater.updateReadyToInstall = false
-        XCTAssertTrue(owner.validateMenuItem(items[0]))
-        XCTAssertEqual(items[0].title, "检查更新…")
+        view.refresh()
+        XCTAssertTrue(view.subviews.compactMap { $0 as? NSTextField }.contains { $0.stringValue == "更新已下载" })
     }
 
     @MainActor
-    func testMissingUpdaterDisablesMenusAndSeparateMenusOwnSeparateItems() {
-        let owner = AppDelegate(websiteDataStore: .nonPersistent())
-        let main = NSMenu()
-        let status = NSMenu()
-        let mainItems = updateItems(owner)
-        let statusItems = updateItems(owner)
-        for item in mainItems { main.addItem(item) }
-        for item in statusItems { status.addItem(item) }
-        for (first, second) in zip(mainItems, statusItems) {
-            XCTAssertFalse(first === second)
-            XCTAssertTrue(first.menu === main)
-            XCTAssertTrue(second.menu === status)
-            XCTAssertFalse(owner.validateMenuItem(first))
-        }
-        XCTAssertEqual(mainItems[1].state, .off)
-        owner.checkForUpdates(nil)
-        owner.toggleAutomaticUpdates(nil)
+    func testUnavailableUpdaterDisablesUpdateControls() throws {
+        _ = NSApplication.shared
+        let view = SettingsGeneralView(updater: nil, defaults: .standard)
+        let buttons = view.subviews.compactMap { $0 as? NSButton }
+        XCTAssertFalse(try XCTUnwrap(buttons.first { $0.title == "自动检查并下载更新" }).isEnabled)
+        XCTAssertFalse(try XCTUnwrap(buttons.first { $0.title == "检查更新…" }).isEnabled)
     }
 
     @MainActor
@@ -88,9 +91,10 @@ final class AppUpdaterTests: XCTestCase {
         updater.standardUserDriverWillHandleShowingUpdate(false, forUpdate: item, state: state)
         XCTAssertTrue(updater.updateAvailable)
         var installedImmediately = false
-        XCTAssertFalse(updater.updater(updater.controller.updater, willInstallUpdateOnQuit: item,
-                                      immediateInstallationBlock: { installedImmediately = true }))
+        XCTAssertTrue(updater.updater(updater.controller.updater, willInstallUpdateOnQuit: item,
+                                     immediateInstallationBlock: { installedImmediately = true }))
         XCTAssertTrue(updater.updateReadyToInstall)
+        XCTAssertEqual(updater.preparedUpdateVersion, "99")
         updater.standardUserDriverDidReceiveUserAttention(forUpdate: item)
         XCTAssertFalse(updater.updateAvailable)
         XCTAssertTrue(updater.updateReadyToInstall)
@@ -108,6 +112,8 @@ final class AppUpdaterTests: XCTestCase {
         XCTAssertFalse(installedImmediately)
         XCTAssertTrue(owner.sessions.isEmpty)
         XCTAssertNil(owner.backgroundPageReleaseTask)
+        updater.installAndRestart()
+        XCTAssertTrue(installedImmediately)
     }
 
     @MainActor
@@ -118,8 +124,8 @@ final class AppUpdaterTests: XCTestCase {
         ]))
         let state = try updateState(stage: .installing, userInitiated: true)
         var installedImmediately = false
-        XCTAssertFalse(updater.updater(updater.controller.updater, willInstallUpdateOnQuit: item,
-                                      immediateInstallationBlock: { installedImmediately = true }))
+        XCTAssertTrue(updater.updater(updater.controller.updater, willInstallUpdateOnQuit: item,
+                                     immediateInstallationBlock: { installedImmediately = true }))
         XCTAssertTrue(updater.updateReadyToInstall)
         // Invoke Sparkle's optional delegate callback so the regression also
         // executes against the old implementation where it was unhandled.
@@ -128,6 +134,7 @@ final class AppUpdaterTests: XCTestCase {
         XCTAssertTrue(updater.updateReadyToInstall, "Dismissing keeps Sparkle's scheduled installation")
         delegate.updater?(updater.controller.updater, userDidMake: .skip, forUpdate: item, state: state)
         XCTAssertFalse(updater.updateReadyToInstall, "Skipping cancels Sparkle's prepared installation")
+        updater.installAndRestart()
         XCTAssertFalse(installedImmediately)
     }
 
@@ -143,11 +150,7 @@ final class AppUpdaterTests: XCTestCase {
         return try XCTUnwrap(SPUUserUpdateState(coder: decoder))
     }
 
-    @MainActor
-    private func updateItems(_ owner: AppDelegate) -> [NSMenuItem] {
-        makeUpdateMenuItems(target: owner, checkAction: #selector(AppDelegate.checkForUpdates(_:)),
-                            automaticAction: #selector(AppDelegate.toggleAutomaticUpdates(_:)))
-    }
+
 }
 
 @MainActor
@@ -156,8 +159,12 @@ private final class FakeAppUpdater: AppUpdating {
     var automaticUpdatesEnabled = false
     var updateReadyToInstall = false
     var updateAvailable = false
+    var preparedUpdateVersion: String?
+    var onReadyToInstall: (() -> Void)?
     var startCount = 0
     var checkCount = 0
+    var installCount = 0
     func start() { startCount += 1 }
     func checkForUpdates() { checkCount += 1 }
+    func installAndRestart() { installCount += 1 }
 }

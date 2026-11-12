@@ -7,8 +7,11 @@ protocol AppUpdating: AnyObject {
     var automaticUpdatesEnabled: Bool { get set }
     var updateReadyToInstall: Bool { get }
     var updateAvailable: Bool { get }
+    var preparedUpdateVersion: String? { get }
+    var onReadyToInstall: (() -> Void)? { get set }
     func start()
     func checkForUpdates()
+    func installAndRestart()
 }
 
 /// Sparkle owns downloading and installation on normal application termination.
@@ -20,6 +23,9 @@ final class AppUpdater: NSObject, AppUpdating, SPUUpdaterDelegate, @preconcurren
     private(set) var controller: SPUStandardUpdaterController!
     private(set) var updateReadyToInstall = false
     private(set) var updateAvailable = false
+    private(set) var preparedUpdateVersion: String?
+    var onReadyToInstall: (() -> Void)?
+    private var immediateInstallation: (() -> Void)?
 
     override init() {
         super.init()
@@ -47,6 +53,8 @@ final class AppUpdater: NSObject, AppUpdating, SPUUpdaterDelegate, @preconcurren
     }
 
     func checkForUpdates() { controller.checkForUpdates(nil) }
+
+    func installAndRestart() { immediateInstallation?() }
 
     var supportsGentleScheduledUpdateReminders: Bool { true }
 
@@ -78,14 +86,18 @@ final class AppUpdater: NSObject, AppUpdating, SPUUpdaterDelegate, @preconcurren
                  forUpdate updateItem: SUAppcastItem, state: SPUUserUpdateState) {
         if choice == .skip, state.stage == .installing {
             updateReadyToInstall = false
+            immediateInstallation = nil
+            preparedUpdateVersion = nil
         }
     }
 
     func updater(_ updater: SPUUpdater, willInstallUpdateOnQuit item: SUAppcastItem,
                  immediateInstallationBlock immediateInstallHandler: @escaping () -> Void) -> Bool {
         updateReadyToInstall = true
-        // Returning false leaves installation attached to a normal quit. Never
-        // retain or invoke the block that would install and restart immediately.
-        return false
+        preparedUpdateVersion = item.versionString
+        immediateInstallation = immediateInstallHandler
+        // Sparkle must receive the return value before its installation handler is invoked.
+        Task { @MainActor [weak self] in self?.onReadyToInstall?() }
+        return true
     }
 }

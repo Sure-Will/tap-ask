@@ -4,6 +4,18 @@ namespace TapAsk.Core.Tests;
 
 public class ProviderAndLastPageTests
 {
+    [Theory]
+    [InlineData("claude", "https://claude.ai/login")]
+    [InlineData("deepseek", "https://chat.deepseek.com/sign_in")]
+    [InlineData("chatgpt", "https://chatgpt.com/auth/login")]
+    public void HomeHostLoginPathsAreNotSavedOrRestored(string id, string value)
+    {
+        var provider = Catalog.Providers.Single(p => p.Id == id);
+        var policy = new NavigationPolicy(provider, Catalog.IdentityHosts);
+        Assert.Null(LastPage.Saved(new Uri(value), policy));
+        Assert.Null(LastPage.Restored(value, policy));
+        Assert.NotNull(LastPage.Saved(new Uri(new Uri(value).GetLeftPart(UriPartial.Authority) + "/chat/login"), policy));
+    }
     private static readonly ProviderCatalog Catalog = ProviderCatalog.Load(
         File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "providers.json")));
     private static readonly NavigationPolicy Policy = new(Catalog.Providers[0], Catalog.IdentityHosts);

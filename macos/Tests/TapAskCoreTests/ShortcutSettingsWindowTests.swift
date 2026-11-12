@@ -7,6 +7,40 @@ import XCTest
 /// Requires WindowServer, but does not register a global shortcut or change preferences.
 final class ShortcutSettingsWindowTests: XCTestCase {
     @MainActor
+    func testUnifiedSettingsRetainsExistingControlsAndKeyboardCapture() throws {
+        _ = NSApplication.shared
+        let providers = try SharedFixtures.catalog().providers
+        let order = ProviderOrderWindowController(providers: providers)
+        let controller = ShortcutSettingsWindowController(shortcut: .defaultShortcut)
+        controller.configureSettings(orderController: order, updater: nil, defaults: .standard)
+        let window = try XCTUnwrap(controller.window)
+        defer { window.close() }
+        controller.present(shortcut: .defaultShortcut)
+        let tabs = try XCTUnwrap(window.contentView as? NSTabView)
+        XCTAssertEqual(tabs.tabViewItems.map(\.label), ["通用", "快捷键", "服务商排序"])
+        tabs.selectTabViewItem(at: 1)
+        let pane = try XCTUnwrap(tabs.selectedTabViewItem?.view)
+        pane.layoutSubtreeIfNeeded()
+        let recorder = try XCTUnwrap(pane.subviews.compactMap { $0 as? NSButton }.first {
+            $0.title == GlobalShortcut.defaultShortcut.displayString
+        })
+        var changes: [Bool] = []
+        controller.onRecordingChange = { changes.append($0) }
+        recorder.performClick(nil)
+        tabs.selectTabViewItem(at: 2)
+        XCTAssertEqual(changes, [true, false])
+        XCTAssertNotNil(tabs.selectedTabViewItem?.view?.subviews.first { $0 is NSScrollView })
+        tabs.selectTabViewItem(at: 1)
+        recorder.performClick(nil)
+        window.sendEvent(try key(kVK_ANSI_K, "k", .control))
+        XCTAssertEqual(changes, [true, false, true, false])
+        XCTAssertEqual(recorder.title, GlobalShortcut(keyCode: UInt16(kVK_ANSI_K), modifiers: .control)?.displayString)
+        for view in pane.subviews {
+            XCTAssertTrue(pane.bounds.contains(view.frame), "Control must fit in settings: \(view)")
+            XCTAssertFalse(view.hasAmbiguousLayout)
+        }
+    }
+    @MainActor
     func testApplicationDispatchCannotRunMainMenuCommandWhileRecording() throws {
         let app = NSApplication.shared
         let previousMenu = app.mainMenu

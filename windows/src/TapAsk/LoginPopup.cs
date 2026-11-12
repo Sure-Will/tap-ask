@@ -26,6 +26,7 @@ internal sealed class LoginPopup : Form
     private ulong activeNavigationId;
     private Rectangle? placedScreen;
     private bool userAdjusted;
+    private InfoOverlayForm? noticeOverlay, loadingOverlay;
     public WebView2 View { get; } = new() { Dock = DockStyle.Fill };
     public Uri InitialUrl => initialUrl;
     public event Action? Completed;
@@ -44,20 +45,33 @@ internal sealed class LoginPopup : Form
         toolbar.Controls.Add(hostLabel); toolbar.Controls.Add(complete);
         failure.Controls.Add(retry); failure.Controls.Add(failureLabel); retry.BringToFront();
         failure.Resize += (_, _) => retry.Location = new Point((failure.Width - retry.Width) / 2, failure.Height / 2 + 28);
-        Controls.Add(failure); Controls.Add(View); Controls.Add(toolbar); Controls.Add(noticeLabel);
+        Controls.Add(View); Controls.Add(toolbar);
         complete.Click += (_, _) => Completed?.Invoke();
         retry.Click += (_, _) => Retry();
         hostLabel.Text = initialUrl.IdnHost;
         ResizeEnd += (_, _) => userAdjusted = true;
         loadTimer.Tick += (_, _) => UpdateLoading();
-        noticeTimer.Tick += (_, _) => { noticeTimer.Stop(); noticeLabel.Visible = false; };
-        loadTimer.Start();
+        noticeTimer.Tick += (_, _) => { noticeTimer.Stop(); noticeLabel.Visible = false; RefreshOverlays(); };
+        Shown += (_, _) =>
+        {
+            noticeOverlay = new InfoOverlayForm(this); noticeOverlay.InitializeOverlay();
+            loadingOverlay = new InfoOverlayForm(this, centered: true, retry: Retry); loadingOverlay.InitializeOverlay();
+            RefreshOverlays();
+        };
+        Move += (_, _) => UpdateOverlayPositions();
+        Resize += (_, _) => UpdateOverlayPositions();
+        VisibleChanged += (_, _) =>
+        {
+            SetMemoryTarget(Visible);
+            RefreshOverlays();
+        };
     }
 
     public async Task InitializeAsync(CoreWebView2Environment environment)
     {
         await View.EnsureCoreWebView2Async(environment);
         var core = View.CoreWebView2;
+        SetMemoryTarget(Visible);
         core.Settings.AreDevToolsEnabled = false;
         core.Settings.IsStatusBarEnabled = false;
         core.Settings.AreBrowserAcceleratorKeysEnabled = false;
@@ -110,6 +124,7 @@ internal sealed class LoginPopup : Form
             if (e.WebErrorStatus == CoreWebView2WebErrorStatus.OperationCanceled) return;
             deadline.Finish();
             loading = false;
+            loadTimer.Stop();
             if (e.IsSuccess) { hasCommittedPage = true; HideOverlay(); }
             else if (!hasCommittedPage) ShowFailure();
         };
@@ -120,6 +135,7 @@ internal sealed class LoginPopup : Form
                 hasCommittedPage = false;
                 deadline.Finish();
                 loading = false;
+                loadTimer.Stop();
                 BeginInvoke(Retry);
             }
         };
@@ -138,6 +154,18 @@ internal sealed class LoginPopup : Form
             new PanelRect(work.Left, work.Top, work.Width, work.Height), desiredWidth, desiredHeight, (int)Math.Round(12 * scale));
         MinimumSize = new Size(Math.Min((int)Math.Round(360 * scale), frame.Width), Math.Min((int)Math.Round(480 * scale), frame.Height));
         Bounds = new Rectangle(frame.X, frame.Y, frame.Width, frame.Height);
+    }
+
+    internal void SetMemoryTarget(bool visible)
+    {
+        if (View.IsDisposed) return;
+        try
+        {
+            if (View.CoreWebView2 is { } core)
+                core.MemoryUsageTargetLevel = visible ? CoreWebView2MemoryUsageTargetLevel.Normal : CoreWebView2MemoryUsageTargetLevel.Low;
+        }
+        catch (System.Runtime.InteropServices.COMException)
+        { NavigationLog.Write(opener.Provider.Id, "popup-memory-target", null, "failed"); }
     }
 
     private void Retry()
@@ -167,6 +195,7 @@ internal sealed class LoginPopup : Form
                 deadline.Start(now);
                 if (!loading) loadingStarted = now;
                 loading = true;
+                loadTimer.Start();
             }
         }
         NavigationLog.Write(opener.Provider.Id, topLevel ? "popup-action" : "popup-frame-action", url,
@@ -181,6 +210,7 @@ internal sealed class LoginPopup : Form
         {
             deadline.Finish();
             loading = false;
+            loadTimer.Stop();
             try { View.CoreWebView2.Stop(); }
             catch (System.Runtime.InteropServices.COMException)
             { NavigationLog.Write(opener.Provider.Id, "popup-stop", null, "failed"); }
@@ -190,9 +220,8 @@ internal sealed class LoginPopup : Form
         {
             failureLabel.Text = "正在打开登录页…";
             retry.Visible = false;
-            View.Visible = false;
             failure.Visible = true;
-            failure.BringToFront();
+            RefreshOverlays();
         }
     }
 
@@ -200,15 +229,15 @@ internal sealed class LoginPopup : Form
     {
         failureLabel.Text = "登录页打不开";
         retry.Visible = true;
-        View.Visible = false;
         failure.Visible = true;
-        failure.BringToFront();
+        RefreshOverlays();
     }
 
     private void HideOverlay()
     {
         failure.Visible = false;
         View.Visible = true;
+        RefreshOverlays();
     }
 
     private void ShowBlocked(Uri? url, NavigationDecision decision)
@@ -220,6 +249,7 @@ internal sealed class LoginPopup : Form
             : $"已拦截 {url.IdnHost}：TapAsk 只打开 {opener.Provider.Name} 和常见登录页";
         noticeLabel.Visible = true;
         noticeTimer.Stop(); noticeTimer.Start();
+        RefreshOverlays();
     }
 
     private void OpenExternal(Uri url)
@@ -230,11 +260,20 @@ internal sealed class LoginPopup : Form
         noticeLabel.Text = opened ? $"已在浏览器中打开 {url.IdnHost}" : $"无法打开浏览器：{url.IdnHost}";
         noticeLabel.Visible = true;
         noticeTimer.Stop(); noticeTimer.Start();
+        RefreshOverlays();
     }
+
+    private void RefreshOverlays()
+    {
+        noticeOverlay?.SetContent(noticeLabel.Text, noticeLabel.Visible);
+        loadingOverlay?.SetContent(failureLabel.Text, failure.Visible, canRetry: retry.Visible);
+    }
+
+    private void UpdateOverlayPositions() { noticeOverlay?.UpdatePosition(); loadingOverlay?.UpdatePosition(); }
 
     protected override void Dispose(bool disposing)
     {
-        if (disposing) { externalLinkMenu?.Dispose(); loadTimer.Dispose(); noticeTimer.Dispose(); }
+        if (disposing) { externalLinkMenu?.Dispose(); loadTimer.Dispose(); noticeTimer.Dispose(); noticeOverlay?.Dispose(); loadingOverlay?.Dispose(); }
         base.Dispose(disposing);
     }
 }

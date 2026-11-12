@@ -34,10 +34,12 @@ internal sealed class MainForm : Form
     private LoginPopup? loginPopup;
     private Uri? interruptedLoginUrl;
     private ShortcutSettingsForm? shortcutSettings;
+    private SettingsForm? settingsForm;
     private GlobalShortcut shortcut;
     private int hotkeyId = 1;
     private DragHandleForm? dragHandle;
     private ResizeBorderForm? resizeBorder;
+    private InfoOverlayForm? originOverlay, noticeOverlay, loadingOverlay;
     private bool hotkeyRegistered, quitting;
     private bool suppressInitialShow;
     private bool suppressPopupFocus;
@@ -62,13 +64,10 @@ internal sealed class MainForm : Form
         settings.SaveLastProviderId(provider.Id);
         retention.DidDisplay(provider.Id, Now());
         Controls.Add(pageHost);
-        Controls.Add(originLabel);
-        Controls.Add(noticeLabel);
-        noticeTimer.Tick += (_, _) => { noticeTimer.Stop(); noticeLabel.Visible = false; };
+        noticeTimer.Tick += (_, _) => { noticeTimer.Stop(); noticeLabel.Visible = false; RefreshInfoOverlays(); };
         loadOverlay.Controls.Add(retryButton);
         loadOverlay.Controls.Add(loadMessage);
         retryButton.BringToFront();
-        pageHost.Controls.Add(loadOverlay);
         loadOverlay.Resize += (_, _) => retryButton.Location = new Point((loadOverlay.Width - retryButton.Width) / 2, loadOverlay.Height / 2 + 32);
         retryButton.Click += (_, _) => ActiveSession?.Reload();
         menu.Opening += (_, _) => BuildMenu();
@@ -81,12 +80,19 @@ internal sealed class MainForm : Form
         {
             resizeBorder = new ResizeBorderForm(this); resizeBorder.Show(this); resizeBorder.UpdatePosition();
             dragHandle = new DragHandleForm(this); dragHandle.Show(this); dragHandle.UpdatePosition();
+            originOverlay = new InfoOverlayForm(this); originOverlay.InitializeOverlay();
+            noticeOverlay = new InfoOverlayForm(this); noticeOverlay.InitializeOverlay();
+            loadingOverlay = new InfoOverlayForm(this, centered: true, retry: () => ActiveSession?.Reload()); loadingOverlay.InitializeOverlay();
+            RefreshInfoOverlays();
         };
         Move += (_, _) => UpdateOverlays();
         Resize += (_, _) => UpdateOverlays();
         DpiChanged += (_, _) => UpdateOverlays();
         VisibleChanged += (_, _) =>
         {
+            foreach (var session in sessions.Values) session.SetMemoryTarget(Visible);
+            loginPopup?.SetMemoryTarget(Visible);
+            RefreshInfoOverlays();
             if (dragHandle is null) return;
             if (Visible) { resizeBorder?.Show(this); dragHandle.Show(this); UpdateOverlays(); }
             else { resizeBorder?.Hide(); dragHandle.Hide(); }
@@ -97,9 +103,9 @@ internal sealed class MainForm : Form
             var now = Now();
             ReleaseSession(retention.Expire(now));
             foreach (var retainedSession in sessions.Values.ToArray()) retainedSession.CheckTimeout(now);
-            if (ActiveSession is { } session) SessionChanged(session);
+            if (ActiveSession is { } session && (session.Initializing || session.Loading)) SessionChanged(session);
+            UpdateMaintenanceTimer();
         };
-        maintenanceTimer.Start();
         updateTimer.Tick += async (_, _) => await updater.CheckIfDueAsync();
         updateTimer.Start();
     }
@@ -165,7 +171,7 @@ internal sealed class MainForm : Form
         }
         if (message.Msg == WmHotkey && message.WParam.ToInt32() == hotkeyId)
         {
-            if (shortcutSettings is not null) { shortcutSettings.RecordShortcut(shortcut); return; }
+            if (shortcutSettings is not null && settingsForm?.ShortcutSelected == true) { shortcutSettings.RecordShortcut(shortcut); return; }
             NavigationLog.Write(provider.Id, "hotkey", null, Visible ? "hide" : "show");
             TogglePanel(); return;
         }
@@ -186,7 +192,7 @@ internal sealed class MainForm : Form
             return true;
         }
         if (key == Keys.R) { ActiveSession?.Reload(); return true; }
-        if (key == Keys.Oemcomma) { EditShortcut(); return true; }
+        if (key == Keys.Oemcomma) { EditSettings(); return true; }
         return false;
     }
 
@@ -216,6 +222,7 @@ internal sealed class MainForm : Form
             foreach (var session in sessions.Values) session.Dispose();
             sessions.Clear();
             resizeBorder?.Dispose(); dragHandle?.Dispose();
+            originOverlay?.Dispose(); noticeOverlay?.Dispose(); loadingOverlay?.Dispose();
             tray.Visible = false; menu.Dispose(); tray.Dispose(); trayIcon.Dispose();
         }
         base.Dispose(disposing);
@@ -246,34 +253,24 @@ internal sealed class MainForm : Form
             menu.Items.Add(new ToolStripMenuItem(itemProvider.Name, null, (_, _) => SwitchProvider(itemProvider))
             { Checked = itemProvider.Id == provider.Id, ShortcutKeyDisplayString = $"Ctrl+{i + 1}" });
         }
-        menu.Items.Add(new ToolStripMenuItem("服务商排序…", null, (_, _) => EditProviderOrder()));
-        menu.Items.Add(new ToolStripMenuItem("快捷键设置…", null, (_, _) => EditShortcut()));
+        menu.Items.Add(new ToolStripMenuItem("设置…", null, (_, _) => EditSettings()));
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("重新加载", null, (_, _) => ActiveSession?.Reload()) { ShortcutKeyDisplayString = "Ctrl+R" });
-        menu.Items.Add(new ToolStripMenuItem("释放其他服务商页面", null, (_, _) => ReleaseSession(retention.ReleaseBackground()))
-        { Enabled = sessions.Keys.Any(id => id != provider.Id) });
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(new ToolStripMenuItem("检查更新…", null, async (_, _) => await updater.CheckAsync(interactive: true)));
-        menu.Items.Add(new ToolStripMenuItem("自动更新", null, (_, _) => updater.SetEnabled(!updater.Enabled)) { Checked = updater.Enabled });
-        if (!string.IsNullOrEmpty(updater.Status)) menu.Items.Add(new ToolStripMenuItem(updater.Status) { Enabled = false });
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("退出 TapAsk", null, (_, _) => ExitApp()));
     }
 
-    private void EditProviderOrder()
+    private void EditSettings()
     {
-        using var form = new ProviderOrderForm(catalog.Providers, providers);
-        if (form.ShowDialog(this) != DialogResult.OK) return;
-        providers = form.OrderedProviders;
-        settings.SaveProviderOrder(providers.Select(p => p.Id));
-    }
-
-    private void EditShortcut()
-    {
-        using var form = new ShortcutSettingsForm(shortcut, SaveShortcut);
-        shortcutSettings = form;
+        using var form = new SettingsForm(catalog.Providers, providers, shortcut, SaveShortcut, ordered =>
+        {
+            providers = ordered;
+            settings.SaveProviderOrder(providers.Select(p => p.Id));
+        }, updater, settings);
+        settingsForm = form;
+        shortcutSettings = form.ShortcutForm;
         try { form.ShowDialog(this); }
-        finally { shortcutSettings = null; }
+        finally { shortcutSettings = null; settingsForm = null; }
     }
 
     private bool SaveShortcut(GlobalShortcut next)
@@ -304,6 +301,7 @@ internal sealed class MainForm : Form
         interruptedLoginUrl = null;
         noticeTimer.Stop();
         noticeLabel.Visible = false;
+        RefreshInfoOverlays();
         suppressPopupFocus = true;
         try { loginPopup?.Close(); }
         finally { suppressPopupFocus = false; }
@@ -314,6 +312,7 @@ internal sealed class MainForm : Form
         settings.SaveLastProviderId(provider.Id);
         ReleaseSession(retention.DidDisplay(provider.Id, Now()));
         EnsureSession();
+        UpdateMaintenanceTimer();
         if (ActiveSession is { } active) RecoverSession(active);
         if (ActiveSession is { } session) SessionChanged(session);
         if (Visible) ActiveSession?.View.Focus(); else ShowPanel();
@@ -324,6 +323,7 @@ internal sealed class MainForm : Form
         if (id is null || !sessions.Remove(id, out var session)) return;
         pageHost.Controls.Remove(session.View);
         session.Dispose();
+        UpdateMaintenanceTimer();
     }
 
     private void EnsureSession()
@@ -333,18 +333,20 @@ internal sealed class MainForm : Form
         sessions.Add(provider.Id, session);
         pageHost.Controls.Add(session.View);
         _ = session.InitializeAsync();
+        UpdateMaintenanceTimer();
     }
 
     internal void SessionChanged(ProviderSession session)
     {
-        if (IsDisposed || session.Provider.Id != provider.Id) return;
+        if (IsDisposed) return;
+        UpdateMaintenanceTimer();
+        if (session.Provider.Id != provider.Id) return;
         if (session.NeedsRecreate)
         {
             loadMessage.Text = "正在恢复网页…";
             retryButton.Visible = false;
-            session.View.Visible = false;
             loadOverlay.Visible = true;
-            loadOverlay.BringToFront();
+            RefreshInfoOverlays();
             return;
         }
         var current = session.CurrentUrl;
@@ -355,9 +357,15 @@ internal sealed class MainForm : Form
         loadMessage.Text = failed ? session.Failure : "正在打开…";
         retryButton.Visible = failed && !session.Initializing;
         loadOverlay.Visible = waiting || failed;
-        session.View.Visible = !loadOverlay.Visible;
-        if (loadOverlay.Visible) loadOverlay.BringToFront();
-        else session.View.BringToFront();
+        session.View.Visible = true;
+        session.View.BringToFront();
+        RefreshInfoOverlays();
+    }
+
+    private void UpdateMaintenanceTimer()
+    {
+        maintenanceTimer.Enabled = MaintenanceSchedule.NeedsTimer(retention.NextExpiration is not null,
+            sessions.Values.Select(session => (session.Initializing, session.Loading)));
     }
 
     internal void SessionProcessFailed(ProviderSession session)
@@ -383,6 +391,7 @@ internal sealed class MainForm : Form
             : $"已拦截 {url.IdnHost}：TapAsk 只打开 {provider.Name} 和常见登录页";
         noticeLabel.Visible = true;
         noticeTimer.Stop(); noticeTimer.Start();
+        RefreshInfoOverlays();
     }
 
     internal void OpenExternal(ProviderSession session, Uri url)
@@ -394,6 +403,7 @@ internal sealed class MainForm : Form
         noticeLabel.Text = opened ? $"已在浏览器中打开 {url.IdnHost}" : $"无法打开浏览器：{url.IdnHost}";
         noticeLabel.Visible = true;
         noticeTimer.Stop(); noticeTimer.Start();
+        RefreshInfoOverlays();
     }
 
     internal async void HandleNewWindow(ProviderSession session, CoreWebView2NewWindowRequestedEventArgs e)
@@ -529,7 +539,18 @@ internal sealed class MainForm : Form
     }
 
     private void TogglePanel() { if (Visible) HidePanel(); else ShowPanel(); }
-    private void UpdateOverlays() { resizeBorder?.UpdatePosition(); dragHandle?.UpdatePosition(); }
+    private void UpdateOverlays()
+    {
+        resizeBorder?.UpdatePosition(); dragHandle?.UpdatePosition();
+        originOverlay?.UpdatePosition(); noticeOverlay?.UpdatePosition(); loadingOverlay?.UpdatePosition();
+    }
+
+    private void RefreshInfoOverlays()
+    {
+        originOverlay?.SetContent(originLabel.Text, originLabel.Visible);
+        noticeOverlay?.SetContent(noticeLabel.Text, noticeLabel.Visible, originLabel.Visible ? 72 : 28);
+        loadingOverlay?.SetContent(loadMessage.Text, loadOverlay.Visible, canRetry: retryButton.Visible);
+    }
     private void ShowPanel()
     {
         var foreground = GetForegroundWindow();

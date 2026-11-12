@@ -19,10 +19,8 @@ func makeProviderMenuItems(providers: [Provider], currentProviderID: String,
 /// Menu assembly is independent of NSStatusBar so its contract can be tested.
 @MainActor
 func makeStatusMenu(isPanelVisible: Bool, providerItems: [NSMenuItem], target: AnyObject,
-                    toggleAction: Selector, orderAction: Selector, reloadAction: Selector,
-                    releaseOthersAction: Selector, checkUpdatesAction: Selector,
-                    automaticUpdatesAction: Selector, shortcut: GlobalShortcut,
-                    shortcutSettingsAction: Selector) -> NSMenu {
+                    toggleAction: Selector, reloadAction: Selector, shortcut: GlobalShortcut,
+                    settingsAction: Selector) -> NSMenu {
     let menu = NSMenu()
     let toggle = menu.addItem(withTitle: panelVisibilityMenuTitle(isVisible: isPanelVisible),
                               action: toggleAction, keyEquivalent: shortcut.keyEquivalent)
@@ -30,21 +28,12 @@ func makeStatusMenu(isPanelVisible: Bool, providerItems: [NSMenuItem], target: A
     toggle.keyEquivalentModifierMask = shortcut.modifiers.eventFlags
     menu.addItem(.separator())
     for item in providerItems { menu.addItem(item) }
-    let order = menu.addItem(withTitle: "服务商排序…", action: orderAction, keyEquivalent: "")
-    order.target = target
-    let settings = menu.addItem(withTitle: "快捷键设置…", action: shortcutSettingsAction, keyEquivalent: "")
+    let settings = menu.addItem(withTitle: "设置…", action: settingsAction, keyEquivalent: "")
     settings.target = target
     menu.addItem(.separator())
     let reload = menu.addItem(withTitle: "重新加载", action: reloadAction, keyEquivalent: "r")
     reload.target = target
     reload.keyEquivalentModifierMask = .command
-    let releaseOthers = menu.addItem(withTitle: "释放其他服务商页面", action: releaseOthersAction, keyEquivalent: "")
-    releaseOthers.target = target
-    menu.addItem(.separator())
-    for item in makeUpdateMenuItems(target: target, checkAction: checkUpdatesAction,
-                                    automaticAction: automaticUpdatesAction) {
-        menu.addItem(item)
-    }
     menu.addItem(.separator())
     let quit = menu.addItem(withTitle: "退出 TapAsk", action: #selector(NSApplication.terminate(_:)),
                             keyEquivalent: "q")
@@ -69,14 +58,4 @@ func makeStatusImage() -> NSImage {
     image.isTemplate = true
     image.accessibilityDescription = "TapAsk"
     return image
-}
-
-@MainActor
-func makeUpdateMenuItems(target: AnyObject, checkAction: Selector,
-                         automaticAction: Selector) -> [NSMenuItem] {
-    let check = NSMenuItem(title: "检查更新…", action: checkAction, keyEquivalent: "")
-    check.target = target
-    let automatic = NSMenuItem(title: "自动更新", action: automaticAction, keyEquivalent: "")
-    automatic.target = target
-    return [check, automatic]
 }

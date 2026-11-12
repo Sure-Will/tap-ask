@@ -6,6 +6,12 @@ public enum LastPage {
         guard policy.isProviderURL(url), let url,
               url.host?.lowercased() == policy.provider.home.host?.lowercased(),
               let source = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
+        let components = url.pathComponents.dropFirst().map { $0.lowercased() }
+        let loginPaths = ["login", "signin", "sign-in", "sign_in"]
+        if let first = components.first,
+           loginPaths.contains(first) || (first == "auth" && components.count > 1 && loginPaths.contains(components[1])) {
+            return nil
+        }
         var page = URLComponents()
         page.scheme = "https"
         page.host = url.host?.lowercased()

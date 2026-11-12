@@ -9,6 +9,12 @@ public static partial class LastPage
         if (!policy.IsProviderUrl(url) ||
             !string.Equals(url!.IdnHost, policy.Provider.Home.IdnHost, StringComparison.OrdinalIgnoreCase))
             return null;
+        var components = url.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries).Select(Uri.UnescapeDataString).ToArray();
+        string[] loginPaths = ["login", "signin", "sign-in", "sign_in"];
+        if (components.Length > 0 && (loginPaths.Contains(components[0], StringComparer.OrdinalIgnoreCase) ||
+            (string.Equals(components[0], "auth", StringComparison.OrdinalIgnoreCase) && components.Length > 1 &&
+             loginPaths.Contains(components[1], StringComparer.OrdinalIgnoreCase))))
+            return null;
         return $"https://{url.IdnHost.ToLowerInvariant()}{url.AbsolutePath}";
     }
 

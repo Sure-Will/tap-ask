@@ -3,9 +3,11 @@ import Carbon.HIToolbox
 import TapAskCore
 
 @MainActor
-final class ShortcutSettingsWindowController: NSWindowController, NSWindowDelegate {
+final class ShortcutSettingsWindowController: NSWindowController, NSWindowDelegate, NSTabViewDelegate {
     var onSave: ((GlobalShortcut) throws -> Void)?
     var onRecordingChange: ((Bool) throws -> Void)?
+    var onClose: (() -> Void)?
+    private(set) var isOpen = false
 
     private var draft: GlobalShortcut
     private var isRecording = false
@@ -13,6 +15,8 @@ final class ShortcutSettingsWindowController: NSWindowController, NSWindowDelega
     private var eventMonitor: ShortcutEventMonitor?
     private let recorder = NSButton()
     private let errorLabel = NSTextField(wrappingLabelWithString: "")
+    private var settingsTabs: NSTabView?
+    private var generalView: SettingsGeneralView?
 
     init(shortcut: GlobalShortcut) {
         draft = shortcut
@@ -81,19 +85,54 @@ final class ShortcutSettingsWindowController: NSWindowController, NSWindowDelega
 
     required init?(coder: NSCoder) { nil }
 
+    func configureSettings(orderController: ProviderOrderWindowController,
+                           updater: (any AppUpdating)?, defaults: UserDefaults) {
+        guard settingsTabs == nil, let window, let shortcutView = window.contentView,
+              let orderWindow = orderController.window, let orderView = orderWindow.contentView else { return }
+        orderWindow.contentView = NSView()
+        window.contentView = NSView()
+        let general = SettingsGeneralView(updater: updater, defaults: defaults)
+        let tabs = NSTabView()
+        tabs.delegate = self
+        for (title, view) in [("通用", general as NSView), ("快捷键", shortcutView), ("服务商排序", orderView)] {
+            let item = NSTabViewItem(identifier: title)
+            item.label = title
+            item.view = view
+            tabs.addTabViewItem(item)
+        }
+        window.contentView = tabs
+        window.setContentSize(NSSize(width: 430, height: 400))
+        window.title = "设置"
+        settingsTabs = tabs
+        generalView = general
+    }
+
     func present(shortcut: GlobalShortcut) {
+        isOpen = true
         if stopRecording() {
             draft = shortcut
             errorLabel.stringValue = ""
         }
         updateRecorder()
+        generalView?.refresh()
         if NSApp.isHidden { NSApp.unhide(nil) }
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
-        window?.makeFirstResponder(recorder)
+        if settingsTabs == nil || settingsTabs?.selectedTabViewItem?.identifier as? String == "快捷键" {
+            window?.makeFirstResponder(recorder)
+        }
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool { stopRecording() }
+
+    func tabView(_ tabView: NSTabView, shouldSelect tabViewItem: NSTabViewItem?) -> Bool {
+        stopRecording()
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        isOpen = false
+        onClose?()
+    }
 
     func windowDidResignKey(_ notification: Notification) {
         stopRecording()

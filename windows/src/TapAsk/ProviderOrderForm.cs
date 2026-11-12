@@ -27,6 +27,8 @@ internal sealed class ProviderOrderForm : Form
         var ok = new Button { Text = "保存", DialogResult = DialogResult.OK, AutoSize = true };
         var cancel = new Button { Text = "取消", DialogResult = DialogResult.Cancel, AutoSize = true };
         var reset = new Button { Text = "恢复默认", AutoSize = true };
+        ok.Click += (_, _) => { DialogResult = DialogResult.OK; Close(); };
+        cancel.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
         reset.Click += (_, _) => { list.Items.Clear(); list.Items.AddRange(this.defaults); list.SelectedIndex = 0; };
         buttons.Controls.AddRange([ok, cancel, reset]);
         Controls.Add(list); Controls.Add(help); Controls.Add(buttons);

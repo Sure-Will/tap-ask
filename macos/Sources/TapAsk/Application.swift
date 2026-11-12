@@ -37,12 +37,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var statusMenu: NSMenu?
     private(set) var sessions: [String: ProviderSession] = [:]
     private(set) var currentSession: ProviderSession!
+    private var currentProvider: Provider?
     private let defaults: UserDefaults
     private let updater: (any AppUpdating)?
     private let websiteDataStore: WKWebsiteDataStore
     private let retentionNow: () -> ContinuousClock.Instant
     private var retentionPolicy = SessionRetentionPolicy()
     private(set) var backgroundPageReleaseTask: Task<Void, Never>?
+    private var hiddenPageLifetime = HiddenPageLifetime()
+    private var hiddenPageReleaseTask: Task<Void, Never>?
+    private var idlePageWasReleased = false
     private(set) var loginPopup: LoginPopup?
     private lazy var shortcutController = GlobalShortcutController(defaults: defaults) { [weak self] shortcut in
         try HotKey(shortcut: shortcut) { [weak self] in self?.togglePanel() }
@@ -64,15 +68,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         self.websiteDataStore = websiteDataStore
         self.retentionNow = retentionNow
         super.init()
+        updater?.onReadyToInstall = { [weak self] in self?.installIdleUpdateIfPossible() }
     }
 
-    deinit { backgroundPageReleaseTask?.cancel() }
+    deinit { backgroundPageReleaseTask?.cancel(); hiddenPageReleaseTask?.cancel() }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let launchEvent = NSAppleEventManager.shared().currentAppleEvent
         let launchedAtLogin = launchEvent?.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue
             == keyAELaunchedAsLogInItem
             || launchEvent?.paramDescriptor(forKeyword: keyAELaunchedAsLogInItem) != nil
+        let launchedAfterIdleUpdate = IdleUpdateRelaunch.consume(
+            currentVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String, defaults: defaults)
 
         catalog = catalog ?? loadProviders()
         orderedProviders = ProviderOrder.ordered(catalog.providers,
@@ -83,7 +90,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
         configurePanel()
 
-        switchProvider(to: provider)
+        if launchedAfterIdleUpdate { currentProvider = provider }
+        else { switchProvider(to: provider) }
         installMainMenu()
         installStatusItem()
         startUpdater()
@@ -101,12 +109,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             NSApp.activate()
             let alert = NSAlert()
             alert.messageText = "\(shortcutController.shortcut.displayString) 注册失败"
-            alert.informativeText = "仍可点击菜单栏图标呼出窗口，或在右键菜单的“快捷键设置…”中更换组合键。"
+            alert.informativeText = "仍可点击菜单栏图标呼出窗口，或在“设置…”的快捷键页更换组合键。"
             alert.addButton(withTitle: "好")
             alert.runModal()
             #endif
         }
-        if !launchedAtLogin || hotKeyUnavailable { presentPanel() }
+        if (!launchedAtLogin && !launchedAfterIdleUpdate) || hotKeyUnavailable { presentPanel() }
+        else { scheduleHiddenPageRelease() }
         #if DEBUG
         startSoakIfRequested()
         #endif
@@ -115,7 +124,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     func configurePanel() {
         panel = ChatPanel(defaults: defaults)
         panel.onCancel = { [weak self] in self?.hidePanel() }
-        panel.onRetry = { [weak self] in self?.currentSession.loadHome() }
+        panel.onRetry = { [weak self] in self?.currentSession?.loadHome() }
         panel.onBecomeKey = { [weak self] in
             if self?.loginPopup == nil { self?.recordKeyLatency() }
         }
@@ -160,7 +169,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     private func presentPanel() {
         releaseExpiredBackgroundPages()
-        if currentSession.needsReloadOnDisplay { currentSession.prepareForDisplay() }
+        releaseIdleCurrentPageIfNeeded(allowUpdate: false)
+        hiddenPageReleaseTask?.cancel()
+        hiddenPageReleaseTask = nil
+        hiddenPageLifetime.show()
+        if currentSession == nil, let currentProvider { switchProvider(to: currentProvider) }
+        idlePageWasReleased = false
+        if currentSession?.needsReloadOnDisplay == true { currentSession?.prepareForDisplay() }
         if !panel.isVisible { panel.prepareForPresentation() }
         needsWebFocus = true
         if NSApp.isHidden { NSApp.unhide(nil) }
@@ -175,18 +190,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             loginPopup.show(relativeTo: panel)
         } else {
             panel.makeKeyAndOrderFront(nil)
-            panel.makeFirstResponder(currentSession.webView)
+            panel.makeFirstResponder(currentSession?.webView)
         }
     }
 
     func switchProvider(to provider: Provider) {
         // Check before lookup: a delayed timer must not revive an expired cached page.
         releaseExpiredBackgroundPages()
+        releaseIdleCurrentPageIfNeeded(allowUpdate: false)
         if let currentSession, currentSession.policy.provider.id == provider.id {
             currentSession.prepareForDisplay()
             return
         }
-        closeLoginPopup(restoreFocus: false)
+        if currentProvider?.id != provider.id { closeLoginPopup(restoreFocus: false) }
         let existing = sessions[provider.id]
         let session = existing ?? makeSession(for: provider)
         displaySession(session)
@@ -198,6 +214,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     func displaySession(_ session: ProviderSession) {
         sessions[session.policy.provider.id] = session
         currentSession = session
+        currentProvider = session.policy.provider
+        idlePageWasReleased = false
         panel.pageView = session.webView
         panel.origin = session.title
         panel.updateLoadState(session.loadState, providerName: session.policy.provider.name)
@@ -213,11 +231,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     func removeAllSessions() {
         backgroundPageReleaseTask?.cancel()
         backgroundPageReleaseTask = nil
+        hiddenPageReleaseTask?.cancel()
+        hiddenPageReleaseTask = nil
+        hiddenPageLifetime.show()
+        idlePageWasReleased = false
         retentionPolicy.reset()
         for session in sessions.values { session.dispose() }
         panel?.makeFirstResponder(nil)
         panel?.pageView = nil
         currentSession = nil
+        currentProvider = nil
         sessions.removeAll()
     }
 
@@ -315,6 +338,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             focusChatWindow()
             if NSApp.isActive { needsWebFocus = false }
         }
+        installIdleUpdateIfPossible()
     }
 
     private func hidePanel() {
@@ -323,6 +347,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         loginPopup?.hide()
         panel.orderOut(nil)
         NSApp.hide(nil)
+        scheduleHiddenPageRelease()
+    }
+
+    private func scheduleHiddenPageRelease() {
+        guard currentSession != nil else { return }
+        hiddenPageLifetime.hide(at: retentionNow())
+        hiddenPageReleaseTask?.cancel()
+        guard let deadline = hiddenPageLifetime.deadline else { return }
+        hiddenPageReleaseTask = Task { @MainActor [weak self] in
+            do { try await Task.sleep(until: deadline, clock: .continuous) }
+            catch { return }
+            guard !Task.isCancelled, let self else { return }
+            self.releaseExpiredBackgroundPages()
+            self.releaseIdleCurrentPageIfNeeded()
+        }
+    }
+
+    func releaseIdleCurrentPageIfNeeded(allowUpdate: Bool = true) {
+        guard panel?.isVisible == false, hiddenPageLifetime.hasExpired(at: retentionNow()),
+              let session = currentSession else { return }
+        panel.makeFirstResponder(nil)
+        panel.pageView = nil
+        sessions.removeValue(forKey: session.policy.provider.id)
+        currentSession = nil
+        session.dispose()
+        retentionPolicy.reset()
+        hiddenPageLifetime.show()
+        hiddenPageReleaseTask?.cancel()
+        hiddenPageReleaseTask = nil
+        idlePageWasReleased = true
+        AppLog.lifecycle.info("phase=page-release reason=idle provider=\(session.policy.provider.id, privacy: .public)")
+        if allowUpdate { installIdleUpdateIfPossible() }
+    }
+
+    private func installIdleUpdateIfPossible() {
+        guard idlePageWasReleased, panel?.isVisible == false, sessions.isEmpty,
+              loginPopup == nil, shortcutSettingsWindow?.isOpen != true,
+              providerOrderWindow?.window?.isVisible != true, statusItem?.menu == nil,
+              updater?.updateReadyToInstall == true else { return }
+        if let version = updater?.preparedUpdateVersion {
+            IdleUpdateRelaunch.prepare(targetVersion: version, defaults: defaults)
+        }
+        idlePageWasReleased = false
+        updater?.installAndRestart()
     }
 
     private func recordKeyLatency() {
@@ -336,11 +404,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         let popupIsKey = loginPopup.map { NSApp.keyWindow === $0.panel } ?? false
         switch pageReloadTarget(isAppActive: NSApp.isActive, isLoginPopupKeyWindow: popupIsKey) {
         case .loginPopup: loginPopup?.reload()
-        case .provider: currentSession.reload()
+        case .provider: reloadCurrentProvider()
         }
     }
 
-    @objc private func reloadProviderPage(_ sender: Any?) { currentSession.reload() }
+    @objc private func reloadProviderPage(_ sender: Any?) { reloadCurrentProvider() }
+
+    private func reloadCurrentProvider() {
+        if currentSession == nil, let currentProvider {
+            switchProvider(to: currentProvider)
+            if panel.isVisible == false { scheduleHiddenPageRelease() }
+        } else { currentSession?.reload() }
+    }
 
     @objc private func togglePanelFromMenu(_ sender: Any?) { togglePanel() }
 
@@ -352,41 +427,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     func startUpdater() { updater?.start() }
 
-    @objc func checkForUpdates(_ sender: Any?) { updater?.checkForUpdates() }
-
-    @objc func toggleAutomaticUpdates(_ sender: Any?) {
-        guard let updater else { return }
-        updater.automaticUpdatesEnabled.toggle()
-    }
-
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        if menuItem.action == #selector(checkForUpdates(_:)) {
-            if updater?.updateReadyToInstall == true {
-                menuItem.title = "检查更新…（退出时安装）"
-            } else if updater?.updateAvailable == true {
-                menuItem.title = "查看更新…"
-            } else {
-                menuItem.title = "检查更新…"
-            }
-            return updater?.canCheckForUpdates == true
-        } else if menuItem.action == #selector(toggleAutomaticUpdates(_:)) {
-            menuItem.state = updater?.automaticUpdatesEnabled == true ? .on : .off
-            return updater != nil
-        }
         if menuItem.action == #selector(selectProvider(_:)) {
             let provider = ProviderSelection.provider(at: menuItem.tag, in: orderedProviders)
-            menuItem.state = provider?.id == currentSession.policy.provider.id ? .on : .off
+            menuItem.state = provider?.id == currentProvider?.id ? .on : .off
         } else if menuItem.action == #selector(togglePanelFromMenu(_:)) {
             menuItem.title = panelVisibilityMenuTitle(isVisible: panel.isVisible)
-        } else if menuItem.action == #selector(releaseOtherProviderPages(_:)) {
-            return sessions.count > 1
         }
         return true
     }
 
     private func makeProviderMenuItems() -> [NSMenuItem] {
         TapAsk.makeProviderMenuItems(providers: orderedProviders,
-                                    currentProviderID: currentSession.policy.provider.id,
+                                    currentProviderID: currentProvider?.id ?? "",
                                     target: self, action: #selector(selectProvider(_:)))
     }
 
@@ -407,7 +460,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             statusMenu = makeCurrentStatusMenu()
             // Let NSStatusItem position and track the menu directly below its button.
             statusItem.menu = statusMenu
-            defer { statusItem.menu = nil }
+            defer { statusItem.menu = nil; installIdleUpdateIfPossible() }
             button.performClick(nil)
         } else {
             togglePanel()
@@ -417,11 +470,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private func makeCurrentStatusMenu() -> NSMenu {
         makeStatusMenu(isPanelVisible: panel.isVisible, providerItems: makeProviderMenuItems(), target: self,
                        toggleAction: #selector(togglePanelFromMenu(_:)),
-                       orderAction: #selector(showProviderOrder(_:)), reloadAction: #selector(reloadProviderPage(_:)),
-                       releaseOthersAction: #selector(releaseOtherProviderPages(_:)),
-                       checkUpdatesAction: #selector(checkForUpdates(_:)),
-                       automaticUpdatesAction: #selector(toggleAutomaticUpdates(_:)),
-                       shortcut: shortcutController.shortcut, shortcutSettingsAction: #selector(showShortcutSettings(_:)))
+                       reloadAction: #selector(reloadProviderPage(_:)),
+                       shortcut: shortcutController.shortcut, settingsAction: #selector(showShortcutSettings(_:)))
     }
 
     private func rebuildProviderMenus() {
@@ -442,14 +492,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     @objc private func showShortcutSettings(_ sender: Any?) {
         if shortcutSettingsWindow == nil {
+            if providerOrderWindow == nil {
+                let order = ProviderOrderWindowController(providers: orderedProviders)
+                order.onOrderChange = { [weak self] ids in self?.saveProviderOrder(ids) }
+                providerOrderWindow = order
+            }
             let controller = ShortcutSettingsWindowController(shortcut: shortcutController.shortcut)
             controller.onRecordingChange = { [weak self] recording in
                 try self?.shortcutController.setRecording(recording)
             }
+            controller.onClose = { [weak self] in self?.installIdleUpdateIfPossible() }
             controller.onSave = { [weak self] shortcut in
                 guard let self else { return }
                 try self.shortcutController.save(shortcut)
                 self.rebuildProviderMenus()
+            }
+            if let providerOrderWindow {
+                controller.configureSettings(orderController: providerOrderWindow, updater: updater, defaults: defaults)
             }
             shortcutSettingsWindow = controller
         }
@@ -549,13 +608,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private func installMainMenu() {
         let main = NSMenu()
         let appMenu = NSMenu(title: "TapAsk")
-        let shortcuts = appMenu.addItem(withTitle: "快捷键设置…", action: #selector(showShortcutSettings(_:)), keyEquivalent: ",")
+        let shortcuts = appMenu.addItem(withTitle: "设置…", action: #selector(showShortcutSettings(_:)), keyEquivalent: ",")
         shortcuts.target = self
-        appMenu.addItem(.separator())
-        for item in makeUpdateMenuItems(target: self, checkAction: #selector(checkForUpdates(_:)),
-                                        automaticAction: #selector(toggleAutomaticUpdates(_:))) {
-            appMenu.addItem(item)
-        }
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "退出 TapAsk", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         let editMenu = NSMenu(title: "Edit")

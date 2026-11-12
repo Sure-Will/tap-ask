@@ -7,6 +7,49 @@ import XCTest
 /// Requires WindowServer/WebKit. Fixtures use only in-memory HTML and isolated stores/defaults.
 final class LifecycleTests: XCTestCase {
     @MainActor
+    func testSwitchAfterHiddenDeadlineReleasesOldPageBeforeCreatingNextPage() throws {
+        _ = NSApplication.shared
+        let catalog = try localCatalog()
+        var now = ContinuousClock.now
+        let owner = AppDelegate(catalog: catalog, websiteDataStore: .nonPersistent(), retentionNow: { now })
+        owner.configurePanel()
+        defer { owner.removeAllSessions(); owner.panel.orderOut(nil) }
+        let old = owner.makeSession(for: catalog.providers[0])
+        owner.displaySession(old)
+        owner.panel.onCancel?()
+        now = now.advanced(by: .seconds(1_800))
+        owner.switchProvider(to: catalog.providers[1])
+        XCTAssertEqual(owner.sessions.count, 1)
+        XCTAssertNil(owner.sessions[catalog.providers[0].id])
+        XCTAssertEqual(owner.currentSession.policy.provider.id, catalog.providers[1].id)
+        assertSessionDisposed(old)
+    }
+    @MainActor
+    func testIdleCurrentPageIsRecreatedWhenPanelReopens() throws {
+        _ = NSApplication.shared
+        let catalog = try localCatalog()
+        var now = ContinuousClock.now
+        let owner = AppDelegate(catalog: catalog, websiteDataStore: .nonPersistent(), retentionNow: { now })
+        owner.configurePanel()
+        defer { owner.removeAllSessions(); owner.panel.orderOut(nil) }
+        let session = owner.makeSession(for: catalog.providers[0])
+        owner.displaySession(session)
+        owner.panel.onCancel?()
+        now = now.advanced(by: .seconds(1_799))
+        owner.releaseIdleCurrentPageIfNeeded()
+        XCTAssertTrue(owner.currentSession === session)
+        now = now.advanced(by: .seconds(1))
+        owner.releaseExpiredBackgroundPages()
+        owner.releaseIdleCurrentPageIfNeeded()
+        XCTAssertNil(owner.currentSession)
+        XCTAssertTrue(owner.sessions.isEmpty)
+        XCTAssertNil(owner.panel.pageView)
+        _ = owner.applicationShouldHandleReopen(NSApplication.shared, hasVisibleWindows: false)
+        XCTAssertNotNil(owner.currentSession)
+        XCTAssertFalse(owner.currentSession === session)
+        XCTAssertEqual(owner.currentSession.policy.provider.id, catalog.providers[0].id)
+    }
+    @MainActor
     func testCompletionButtonReleasesLoginPopupAndItsWebView() throws {
         try assertPopupReleased { _, popup in popup.completionButton.performClick(nil) }
     }
@@ -103,9 +146,6 @@ final class LifecycleTests: XCTestCase {
             owner.removeAllSessions()
             owner.panel.orderOut(nil)
         }
-        let releaseItem = NSMenuItem(title: "释放其他服务商页面",
-                                     action: #selector(AppDelegate.releaseOtherProviderPages(_:)), keyEquivalent: "")
-        XCTAssertFalse(owner.validateMenuItem(releaseItem))
         weak var first: ProviderSession?
         weak var second: ProviderSession?
         weak var current: ProviderSession?
@@ -139,7 +179,6 @@ final class LifecycleTests: XCTestCase {
                     current = session
                     currentPage = session.webView
                 }
-                XCTAssertEqual(owner.validateMenuItem(releaseItem), index > 0)
             }
         }
         advanceMainRunLoop(until: { first == nil && firstPage == nil && firstDelegate == nil })
@@ -183,7 +222,6 @@ final class LifecycleTests: XCTestCase {
         XCTAssertNotNil(popupPage)
         XCTAssertTrue(owner.loginPopup === popup)
         XCTAssertNotNil(popupPage?.navigationDelegate)
-        XCTAssertFalse(owner.validateMenuItem(releaseItem))
         for provider in catalog.providers {
             XCTAssertEqual(defaults.string(forKey: "LastPage.\(provider.id)"),
                            "https://\(provider.hosts[0])/conversation/last")
@@ -196,7 +234,6 @@ final class LifecycleTests: XCTestCase {
         XCTAssertTrue(recreated.webView.configuration.websiteDataStore === store)
         XCTAssertTrue(recreated.webView.navigationDelegate === recreated.webDelegate)
         XCTAssertEqual(owner.sessions.count, 2)
-        XCTAssertTrue(owner.validateMenuItem(releaseItem))
         XCTAssertNil(first, "The released session must not be resurrected")
     }
 
@@ -697,9 +734,8 @@ final class LifecycleTests: XCTestCase {
             let items = makeProviderMenuItems(providers: providers, currentProviderID: providers[0].id,
                                               target: owner, action: action)
             statusMenu = makeStatusMenu(isPanelVisible: true, providerItems: items, target: owner,
-                                        toggleAction: action, orderAction: action, reloadAction: action,
-                                        releaseOthersAction: action, checkUpdatesAction: action,
-                                        automaticUpdatesAction: action, shortcut: .defaultShortcut, shortcutSettingsAction: action)
+                                        toggleAction: action, reloadAction: action,
+                                        shortcut: .defaultShortcut, settingsAction: action)
             XCTAssertTrue(mainMenu.items.first?.target === owner)
             XCTAssertTrue(statusMenu?.items.first?.target === owner)
         }
@@ -709,7 +745,7 @@ final class LifecycleTests: XCTestCase {
         let targetItems = (mainMenu.items + status.items).filter {
             $0.action == #selector(LifecycleMenuTarget.performAction(_:))
         }
-        XCTAssertEqual(targetItems.count, providers.count * 2 + 7)
+        XCTAssertEqual(targetItems.count, providers.count * 2 + 3)
         for item in targetItems { XCTAssertNil(item.target) }
         withExtendedLifetime((mainMenu, status)) {}
     }
