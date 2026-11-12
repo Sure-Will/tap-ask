@@ -5,14 +5,12 @@
   <p>需要时打开，问完后收起，继续手头的事。</p>
   <p>ChatGPT · Claude · Gemini · DeepSeek · Grok · 豆包</p>
   <p>
-    <a href="https://github.com/Sure-Will/tap-ask/releases/download/v0.1.6/TapAsk-0.1.6-macOS.dmg"><strong>下载 macOS</strong></a> ·
-    <a href="https://github.com/Sure-Will/tap-ask/releases/download/v0.1.6/TapAsk-win-Setup.exe"><strong>下载 Windows</strong></a> ·
-    <a href="https://github.com/Sure-Will/tap-ask/releases/download/v0.1.6/TapAsk-win-Portable.zip">Windows 便携版</a>
+    <a href="https://github.com/Sure-Will/tap-ask/releases/download/v0.1.7/TapAsk-0.1.7-macOS.dmg"><strong>下载 macOS</strong></a> ·
+    <a href="https://github.com/Sure-Will/tap-ask/releases/download/v0.1.7/TapAsk-win-Setup.exe"><strong>下载 Windows</strong></a> ·
+    <a href="https://github.com/Sure-Will/tap-ask/releases/download/v0.1.7/TapAsk-win-Portable.zip">Windows 便携版</a>
   </p>
-  <p>当前下载为 0.1.6 · <a href="https://github.com/Sure-Will/tap-ask/releases">查看所有版本</a></p>
+  <p>当前下载为 0.1.7 · <a href="https://github.com/Sure-Will/tap-ask/releases">查看所有版本</a></p>
 </div>
-
-> 下文描述当前源码。下载的 0.1.6 尚不包含统一设置、Mac 闲置页面回收及后台重启等本次改动。
 
 ## TapAsk 能做什么
 
@@ -28,8 +26,8 @@ TapAsk 把六家 AI 网站放在同一个小窗口里。你可以在写代码、
 
 | 平台 | 下载 | 系统要求 |
 | --- | --- | --- |
-| macOS | [通用安装包](https://github.com/Sure-Will/tap-ask/releases/download/v0.1.6/TapAsk-0.1.6-macOS.dmg) | macOS 14 或更高版本，支持 Apple 芯片和 Intel |
-| Windows | [安装版](https://github.com/Sure-Will/tap-ask/releases/download/v0.1.6/TapAsk-win-Setup.exe) · [便携版](https://github.com/Sure-Will/tap-ask/releases/download/v0.1.6/TapAsk-win-Portable.zip) | Windows x64，需要 WebView2 Runtime |
+| macOS | [通用安装包](https://github.com/Sure-Will/tap-ask/releases/download/v0.1.7/TapAsk-0.1.7-macOS.dmg) | macOS 14 或更高版本，支持 Apple 芯片和 Intel |
+| Windows | [安装版](https://github.com/Sure-Will/tap-ask/releases/download/v0.1.7/TapAsk-win-Setup.exe) · [便携版](https://github.com/Sure-Will/tap-ask/releases/download/v0.1.7/TapAsk-win-Portable.zip) | Windows x64，需要 WebView2 Runtime |
 
 ### macOS
 
