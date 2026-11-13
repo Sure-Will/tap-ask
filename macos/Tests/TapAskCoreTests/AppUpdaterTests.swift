@@ -7,7 +7,27 @@ import TapAskCore
 
 final class AppUpdaterTests: XCTestCase {
     @MainActor
-    func testIdleUpdateWaitsForLoginPopupToClose() throws {
+    func testPreparedUpdateCanBeInstalledFromStatusMenu() throws {
+        _ = NSApplication.shared
+        let updater = FakeAppUpdater()
+        let suite = "TapAsk.ManualUpdateTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let owner = AppDelegate(defaults: defaults, updater: updater, websiteDataStore: .nonPersistent())
+        owner.configurePanel()
+        defer { owner.removeAllSessions(); owner.panel.orderOut(nil) }
+        XCTAssertFalse(owner.makeCurrentStatusMenu().items.contains { $0.title == "立即安装并重启" })
+        updater.updateReadyToInstall = true
+        updater.preparedUpdateVersion = "99"
+        let menu = owner.makeCurrentStatusMenu()
+        let index = try XCTUnwrap(menu.items.firstIndex { $0.title == "立即安装并重启" })
+        menu.performActionForItem(at: index)
+        XCTAssertEqual(updater.installCount, 1)
+        XCTAssertTrue(IdleUpdateRelaunch.consume(currentVersion: "99", defaults: defaults))
+    }
+
+    @MainActor
+    func testIdleUpdateWaitsWhenPageSafetyCannotBeVerified() throws {
         _ = NSApplication.shared
         let catalog = try SharedFixtures.catalog()
         let updater = FakeAppUpdater()
@@ -27,17 +47,15 @@ final class AppUpdaterTests: XCTestCase {
         _ = owner.openLoginPopup(configuration: configuration, policy: session.policy, initialURL: nil)
         owner.panel.onCancel?()
         now = now.advanced(by: .seconds(1_800))
+        updater.updateReadyToInstall = true
         owner.releaseIdleCurrentPageIfNeeded()
         XCTAssertNil(owner.currentSession)
         XCTAssertNotNil(owner.loginPopup)
-        updater.updateReadyToInstall = true
-        updater.onReadyToInstall?()
         XCTAssertEqual(updater.installCount, 0)
         owner.closeLoginPopup(restoreFocus: false)
-        XCTAssertEqual(updater.installCount, 1)
-        XCTAssertTrue(IdleUpdateRelaunch.consume(currentVersion: "99", defaults: defaults))
-        updater.onReadyToInstall?()
-        XCTAssertEqual(updater.installCount, 1)
+        XCTAssertEqual(updater.installCount, 0)
+        XCTAssertFalse(IdleUpdateRelaunch.consume(currentVersion: "99", defaults: defaults))
+        XCTAssertTrue(owner.makeCurrentStatusMenu().items.contains { $0.title == "立即安装并重启" })
     }
     @MainActor
     func testSettingsControlsRouteToInjectedUpdater() throws {
@@ -160,7 +178,6 @@ private final class FakeAppUpdater: AppUpdating {
     var updateReadyToInstall = false
     var updateAvailable = false
     var preparedUpdateVersion: String?
-    var onReadyToInstall: (() -> Void)?
     var startCount = 0
     var checkCount = 0
     var installCount = 0

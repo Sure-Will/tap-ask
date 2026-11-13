@@ -8,6 +8,32 @@ namespace TapAsk.WindowsTests;
 public class SettingsFormTests
 {
     [Fact]
+    public void ReadyUpdateCanBeInstalledDirectlyFromMenu()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                using var menu = new ContextMenuStrip();
+                int installs = 0;
+                MainForm.AddUpdateMenuItems(menu.Items, false, () => installs++);
+                Assert.Empty(menu.Items.Cast<ToolStripItem>());
+                MainForm.AddUpdateMenuItems(menu.Items, true, () => installs++);
+                Assert.Equal(new[] { "更新已下载", "立即安装并重启" }, menu.Items.Cast<ToolStripItem>().Select(i => i.Text));
+                Assert.False(menu.Items[0].Enabled);
+                ((ToolStripMenuItem)menu.Items[1]).PerformClick();
+                Assert.Equal(1, installs);
+            }
+            catch (Exception ex) { failure = ex; }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        Assert.True(thread.Join(TimeSpan.FromSeconds(10)), "Update menu interaction did not complete.");
+        if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
+    }
+
+    [Fact]
     public void SettingsCombinesGeneralShortcutAndProviderPages()
     {
         Exception? failure = null;

@@ -66,6 +66,54 @@ final class SettingsGeneralView: NSView {
             updater?.updateAvailable == true ? "有可用更新" : ""
     }
 
+    func toggleMenuItems() -> [NSMenuItem] {
+        refresh()
+        let loginItem = NSMenuItem(title: "登录时启动 TapAsk", action: #selector(toggleLoginFromMenu(_:)), keyEquivalent: "")
+        loginItem.target = self
+        loginItem.state = login.state
+        loginItem.isEnabled = login.isEnabled
+        let updatesItem = NSMenuItem(title: "自动检查并下载更新", action: #selector(toggleUpdatesFromMenu(_:)), keyEquivalent: "")
+        updatesItem.target = self
+        updatesItem.state = automaticUpdates.state
+        updatesItem.isEnabled = automaticUpdates.isEnabled
+        var items = [loginItem]
+        if !loginStatus.stringValue.isEmpty {
+            let status = NSMenuItem(title: loginStatus.stringValue, action: nil, keyEquivalent: "")
+            status.isEnabled = false
+            items.append(status)
+        }
+        items.append(updatesItem)
+        return items
+    }
+
+    func updateMenuItems() -> [NSMenuItem] {
+        refresh()
+        let checkItem = NSMenuItem(title: "检查更新…", action: #selector(checkUpdates(_:)), keyEquivalent: "")
+        checkItem.target = self
+        checkItem.isEnabled = check.isEnabled
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "开发版"
+        let versionItem = NSMenuItem(title: "TapAsk \(version)", action: nil, keyEquivalent: "")
+        versionItem.isEnabled = false
+        var items = [checkItem]
+        if !updateStatus.stringValue.isEmpty {
+            let status = NSMenuItem(title: updateStatus.stringValue, action: nil, keyEquivalent: "")
+            status.isEnabled = false
+            items.append(status)
+        }
+        items.append(versionItem)
+        return items
+    }
+
+    @objc private func toggleLoginFromMenu(_ sender: Any?) {
+        login.state = login.state == .on ? .off : .on
+        changeLogin(login)
+    }
+
+    @objc private func toggleUpdatesFromMenu(_ sender: Any?) {
+        automaticUpdates.state = automaticUpdates.state == .on ? .off : .on
+        changeUpdates(automaticUpdates)
+    }
+
     @objc private func changeLogin(_ sender: NSButton) {
         defaults.set(true, forKey: "LoginItemRegistrationAttempted")
         do {

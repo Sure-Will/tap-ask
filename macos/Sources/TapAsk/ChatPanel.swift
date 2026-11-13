@@ -166,11 +166,13 @@ final class PanelDragView: NSView {
 
     var handleRect: NSRect {
         NSRect(x: bounds.midX - Self.handleSize.width / 2,
-               y: bounds.midY - Self.handleSize.height / 2,
+               y: bounds.midY - Self.handleSize.height / 2 + 4,
                width: Self.handleSize.width, height: Self.handleSize.height)
     }
 
-    private var dragRect: NSRect { handleRect.insetBy(dx: -12, dy: -8) }
+    private var dragRect: NSRect {
+        NSRect(x: bounds.midX - 30, y: bounds.midY - 10, width: 60, height: 20)
+    }
 
     override func draw(_ dirtyRect: NSRect) {
         NSGraphicsContext.saveGraphicsState()

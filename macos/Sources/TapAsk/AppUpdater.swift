@@ -8,7 +8,6 @@ protocol AppUpdating: AnyObject {
     var updateReadyToInstall: Bool { get }
     var updateAvailable: Bool { get }
     var preparedUpdateVersion: String? { get }
-    var onReadyToInstall: (() -> Void)? { get set }
     func start()
     func checkForUpdates()
     func installAndRestart()
@@ -24,7 +23,6 @@ final class AppUpdater: NSObject, AppUpdating, SPUUpdaterDelegate, @preconcurren
     private(set) var updateReadyToInstall = false
     private(set) var updateAvailable = false
     private(set) var preparedUpdateVersion: String?
-    var onReadyToInstall: (() -> Void)?
     private var immediateInstallation: (() -> Void)?
 
     override init() {
@@ -96,8 +94,6 @@ final class AppUpdater: NSObject, AppUpdating, SPUUpdaterDelegate, @preconcurren
         updateReadyToInstall = true
         preparedUpdateVersion = item.versionString
         immediateInstallation = immediateInstallHandler
-        // Sparkle must receive the return value before its installation handler is invoked.
-        Task { @MainActor [weak self] in self?.onReadyToInstall?() }
         return true
     }
 }

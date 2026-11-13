@@ -14,6 +14,7 @@ internal sealed class AppUpdater(SettingsStore settings)
     private bool checking;
     public bool Enabled => settings.AutoUpdateEnabled;
     public bool IsInstalled => manager?.IsInstalled == true;
+    public bool HasPendingUpdate => IsInstalled && manager?.UpdatePendingRestart is not null;
     public string Status { get; private set; } = "";
 
     public void SetEnabled(bool enabled) => settings.SaveAutoUpdateEnabled(enabled);
@@ -48,7 +49,7 @@ internal sealed class AppUpdater(SettingsStore settings)
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stopping.Token);
             timeout.CancelAfter(TimeSpan.FromMinutes(10));
             await manager.DownloadUpdatesAsync(update, cancelToken: timeout.Token);
-            Status = "更新已下载，下次退出时安装";
+            Status = "更新已下载，可从托盘菜单立即安装";
             if (interactive) MessageBox.Show(Status, "TapAsk", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException and not StackOverflowException)
@@ -61,13 +62,16 @@ internal sealed class AppUpdater(SettingsStore settings)
         finally { checking = false; }
     }
 
-    public void PrepareNormalExit()
+    public bool PrepareExit(bool restart, bool startHidden)
     {
-        stopping.Cancel();
         if (manager is not null && manager.IsInstalled && manager.UpdatePendingRestart is { } pending)
         {
-            // Calling this earlier would allow Velopack to terminate a long-running chat after 60 seconds.
-            manager.WaitExitThenApplyUpdates(pending, silent: true, restart: false);
+            // Only hand off immediately before exit: Velopack waits at most 60 seconds.
+            manager.WaitExitThenApplyUpdates(pending, silent: true, restart: restart,
+                restartArgs: restart && startHidden ? ["--background"] : null);
         }
+        else if (restart) return false;
+        stopping.Cancel();
+        return true;
     }
 }

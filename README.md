@@ -5,11 +5,11 @@
   <p>需要时打开，问完后收起，继续手头的事。</p>
   <p>ChatGPT · Claude · Gemini · DeepSeek · Grok · 豆包</p>
   <p>
-    <a href="https://github.com/Sure-Will/tap-ask/releases/download/v0.1.7/TapAsk-0.1.7-macOS.dmg"><strong>下载 macOS</strong></a> ·
-    <a href="https://github.com/Sure-Will/tap-ask/releases/download/v0.1.7/TapAsk-win-Setup.exe"><strong>下载 Windows</strong></a> ·
-    <a href="https://github.com/Sure-Will/tap-ask/releases/download/v0.1.7/TapAsk-win-Portable.zip">Windows 便携版</a>
+    <a href="https://github.com/Sure-Will/tap-ask/releases/download/v0.1.8/TapAsk-0.1.8-macOS.dmg"><strong>下载 macOS</strong></a> ·
+    <a href="https://github.com/Sure-Will/tap-ask/releases/download/v0.1.8/TapAsk-win-Setup.exe"><strong>下载 Windows</strong></a> ·
+    <a href="https://github.com/Sure-Will/tap-ask/releases/download/v0.1.8/TapAsk-win-Portable.zip">Windows 便携版</a>
   </p>
-  <p>当前下载为 0.1.7 · <a href="https://github.com/Sure-Will/tap-ask/releases">查看所有版本</a></p>
+  <p>当前下载为 0.1.8 · <a href="https://github.com/Sure-Will/tap-ask/releases">查看所有版本</a></p>
 </div>
 
 ## TapAsk 能做什么
@@ -20,14 +20,14 @@ TapAsk 把六家 AI 网站放在同一个小窗口里。你可以在写代码、
 - **切换六家服务商**：在 ChatGPT、Claude、Gemini、DeepSeek、Grok 和豆包之间切换，还可以调整顺序。第一次打开默认进入 DeepSeek，以后恢复上次使用的服务商。
 - **接着上次聊**：各家网站的登录状态保存在本机，重新打开时尝试恢复上次停留的页面。最近使用的后台页面会暂时保留。
 - **放在顺手的位置**：窗口可以置顶、拖动和缩放，记住大小与位置；呼出时会根据鼠标所在的屏幕调整位置。
-- **后台更新**：发布版默认检查并下载更新；正常退出时安装。Mac 浮窗长时间隐藏且页面已释放后，也会在空闲时安装并重启。
+- **后台更新**：发布版默认检查并下载更新；下载后可从菜单立即安装并重启，正常退出时也会安装。
 
 ## 下载与安装
 
 | 平台 | 下载 | 系统要求 |
 | --- | --- | --- |
-| macOS | [通用安装包](https://github.com/Sure-Will/tap-ask/releases/download/v0.1.7/TapAsk-0.1.7-macOS.dmg) | macOS 14 或更高版本，支持 Apple 芯片和 Intel |
-| Windows | [安装版](https://github.com/Sure-Will/tap-ask/releases/download/v0.1.7/TapAsk-win-Setup.exe) · [便携版](https://github.com/Sure-Will/tap-ask/releases/download/v0.1.7/TapAsk-win-Portable.zip) | Windows x64，需要 WebView2 Runtime |
+| macOS | [通用安装包](https://github.com/Sure-Will/tap-ask/releases/download/v0.1.8/TapAsk-0.1.8-macOS.dmg) | macOS 14 或更高版本，支持 Apple 芯片和 Intel |
+| Windows | [安装版](https://github.com/Sure-Will/tap-ask/releases/download/v0.1.8/TapAsk-win-Setup.exe) · [便携版](https://github.com/Sure-Will/tap-ask/releases/download/v0.1.8/TapAsk-win-Portable.zip) | Windows x64，需要 WebView2 Runtime |
 
 ### macOS
 
@@ -63,7 +63,7 @@ xattr -dr com.apple.quarantine /Applications/TapAsk.app
 | 重新加载当前页面 | ⌘R | Ctrl+R |
 | 打开设置（浮窗在前台时） | ⌘, | Ctrl+, |
 
-表中显示默认的呼出快捷键。服务商编号随菜单中的排序变化；你也可以右键菜单栏或托盘图标，选择服务商，或在“设置…”中调整排序、快捷键、自启与更新。
+表中显示默认的呼出快捷键，服务商编号随菜单中的排序变化。右键菜单栏或托盘图标可以选择服务商；Mac 版也在菜单栏菜单中调整排序、快捷键、自启与更新，Windows 版从托盘的“设置…”调整。
 
 拖动浮窗顶部中央的短白条可以移动窗口，拖动边缘可以调整大小。
 
@@ -71,13 +71,13 @@ xattr -dr com.apple.quarantine /Applications/TapAsk.app
 
 **快捷键没有反应怎么办？**
 
-先确认 TapAsk 正在运行，再单击菜单栏或托盘图标打开浮窗。右键图标进入“设置…”的快捷键页可以换一组。macOS 组合键须包含 ⌘、⌥ 或 ⌃，Windows 须包含 Ctrl 或 Alt；都可以加 Shift。注册失败时会保留原设置；系统不一定能报告所有冲突，保存后请实际按键确认。
+先确认 TapAsk 正在运行，再单击菜单栏或托盘图标打开浮窗。Mac 右键菜单栏图标选择“设置快捷键…”；Windows 右键托盘图标进入“设置…”的快捷键页。macOS 组合键须包含 ⌘、⌥ 或 ⌃，Windows 须包含 Ctrl 或 Alt；都可以加 Shift。注册失败时会保留原设置；系统不一定能报告所有冲突，保存后请实际按键确认。
 
 **收起浮窗和退出有什么区别？**
 
-收起后 TapAsk 仍在运行。Mac 隐藏满 30 分钟会释放当前页面，再次呼出时重新加载；Windows 隐藏时会降低网页的内存目标。要完全退出，请在菜单栏或托盘的右键菜单中选择“退出 TapAsk”。发布版默认每天在后台检查更新，下载好的更新会在正常退出后安装；Mac 在当前页面因闲置释放且没有登录弹窗或设置窗口时，也可能静默安装并在后台重启。更新会保留登录数据、服务商顺序和窗口偏好，但不保证保留未发送的网页草稿。
+收起后 TapAsk 仍在运行。Mac 隐藏满 30 分钟会释放当前页面，再次呼出时重新加载；Windows 隐藏时会降低网页的内存目标。要完全退出，请在菜单栏或托盘的右键菜单中选择“退出 TapAsk”。发布版默认每天在后台检查更新，下载好的更新会在正常退出后安装；当前网页状态无法可靠确认时，不会主动静默重启。更新下载后可从菜单选择“立即安装并重启”。更新会保留登录数据、服务商顺序和窗口偏好，但不保证保留未发送的网页草稿。
 
-macOS 上也可以在设置中选择“检查更新…”，立即安装并重启。Mac 版 0.1.3 及更早版本需要先手动替换一次，之后才能使用自动更新。
+macOS 上也可以在菜单栏选择“检查更新…”。Mac 版 0.1.3 及更早版本需要先手动替换一次，之后才能使用自动更新。
 
 **切换服务商后，页面会一直留在后台吗？**
 

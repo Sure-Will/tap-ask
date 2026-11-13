@@ -75,6 +75,8 @@ final class ProviderOrderWindowController: NSWindowController, NSTableViewDataSo
         window?.makeFirstResponder(tableView)
     }
 
+    func focusTable() { tableView.window?.makeFirstResponder(tableView) }
+
     func update(providers: [Provider]) {
         let selectedID = self.providers.indices.contains(tableView.selectedRow)
             ? self.providers[tableView.selectedRow].id : nil

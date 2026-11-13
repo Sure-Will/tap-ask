@@ -221,7 +221,7 @@ final class ChatPanelTests: XCTestCase {
             strip.draw(strip.bounds)
         }
         let corner = try XCTUnwrap(bitmap.colorAt(x: 2, y: 2))
-        let center = try XCTUnwrap(bitmap.colorAt(x: 60, y: 12)?.usingColorSpace(.sRGB))
+        let center = try XCTUnwrap(bitmap.colorAt(x: 60, y: 8)?.usingColorSpace(.sRGB))
         XCTAssertEqual(corner.alphaComponent, 0, accuracy: 0.001)
         XCTAssertGreaterThan(center.alphaComponent, 0.8)
         XCTAssertGreaterThan(center.redComponent, 0.9)
@@ -263,7 +263,7 @@ final class ChatPanelTests: XCTestCase {
                 XCTAssertEqual(dragStrip.frame.height, 24, accuracy: 0.5)
                 XCTAssertEqual(dragStrip.handleRect.size, NSSize(width: 36, height: 4))
                 XCTAssertEqual(dragStrip.handleRect.midX, dragStrip.bounds.midX, accuracy: 0.5)
-                XCTAssertEqual(dragStrip.handleRect.midY, dragStrip.bounds.midY, accuracy: 0.5)
+                XCTAssertEqual(dragStrip.handleRect.midY, dragStrip.bounds.midY + 4, accuracy: 0.5)
                 XCTAssertFalse(dragStrip.isOpaque)
                 XCTAssertFalse(notice.isHidden)
                 XCTAssertTrue(webView.bounds.contains(notice.frame))

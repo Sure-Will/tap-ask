@@ -41,6 +41,7 @@ internal sealed class MainForm : Form
     private ResizeBorderForm? resizeBorder;
     private InfoOverlayForm? originOverlay, noticeOverlay, loadingOverlay;
     private bool hotkeyRegistered, quitting;
+    private bool installUpdateOnExit, startHiddenAfterUpdate;
     private bool suppressInitialShow;
     private bool suppressPopupFocus;
     private bool environmentStarted;
@@ -203,9 +204,26 @@ internal sealed class MainForm : Form
         {
             ActiveSession?.SaveCurrentPage();
             SaveFrame();
-            try { updater.PrepareNormalExit(); }
-            catch (Exception ex) when (ex is IOException or InvalidOperationException or COMException)
-            { NavigationLog.Write("app", "update-apply", null, ex.GetType().Name); }
+            try
+            {
+                if (!updater.PrepareExit(installUpdateOnExit, startHiddenAfterUpdate))
+                {
+                    e.Cancel = true;
+                    quitting = installUpdateOnExit = false;
+                    MessageBox.Show("更新尚未准备好，请稍后再试。", "TapAsk", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or InvalidOperationException or COMException
+                or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+            {
+                NavigationLog.Write("app", "update-apply", null, ex.GetType().Name);
+                if (installUpdateOnExit)
+                {
+                    e.Cancel = true;
+                    quitting = installUpdateOnExit = false;
+                    MessageBox.Show("无法启动更新，请稍后再试。", "TapAsk", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+            }
         }
         base.OnFormClosing(e);
     }
@@ -254,10 +272,30 @@ internal sealed class MainForm : Form
             { Checked = itemProvider.Id == provider.Id, ShortcutKeyDisplayString = $"Ctrl+{i + 1}" });
         }
         menu.Items.Add(new ToolStripMenuItem("设置…", null, (_, _) => EditSettings()));
+        AddUpdateMenuItems(menu.Items, updater.HasPendingUpdate, InstallReadyUpdate);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("重新加载", null, (_, _) => ActiveSession?.Reload()) { ShortcutKeyDisplayString = "Ctrl+R" });
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("退出 TapAsk", null, (_, _) => ExitApp()));
+    }
+
+    internal static void AddUpdateMenuItems(ToolStripItemCollection items, bool ready, Action install)
+    {
+        if (!ready) return;
+        items.Add(new ToolStripMenuItem("更新已下载") { Enabled = false });
+        items.Add(new ToolStripMenuItem("立即安装并重启", null, (_, _) => install()));
+    }
+
+    private void InstallReadyUpdate()
+    {
+        if (!updater.HasPendingUpdate)
+        {
+            MessageBox.Show("更新尚未准备好，请稍后再试。", "TapAsk", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+        installUpdateOnExit = true;
+        startHiddenAfterUpdate = !Visible;
+        ExitApp();
     }
 
     private void EditSettings()

@@ -10,16 +10,22 @@ final class StatusMenuTests: XCTestCase {
         let providers = try SharedFixtures.catalog().providers
         let action = #selector(MenuActionTarget.action(_:))
         let items = makeProviderMenuItems(providers: providers, currentProviderID: "deepseek", target: target, action: action)
+        let settings = ["登录时启动 TapAsk", "自动检查并下载更新", "设置快捷键…", "调整服务商顺序…"].map {
+            let item = NSMenuItem(title: $0, action: action, keyEquivalent: "")
+            item.target = target
+            return item
+        }
         let menu = makeStatusMenu(isPanelVisible: false, providerItems: items, target: target,
                                   toggleAction: action, reloadAction: action,
-                                  shortcut: .defaultShortcut, settingsAction: action)
+                                  shortcut: .defaultShortcut, settingsItems: settings)
         XCTAssertEqual(menu.items.map { $0.isSeparatorItem ? "separator" : $0.title },
                        ["显示 TapAsk", "separator", "ChatGPT", "Claude", "Gemini", "DeepSeek", "Grok", "豆包",
-                        "设置…", "separator", "重新加载", "separator", "退出 TapAsk"])
+                        "separator", "登录时启动 TapAsk", "自动检查并下载更新", "设置快捷键…", "调整服务商顺序…",
+                        "separator", "重新加载", "separator", "退出 TapAsk"])
         XCTAssertEqual(items.map(\.state), providers.map { $0.id == "deepseek" ? .on : .off })
         XCTAssertEqual(items.map(\.tag), Array(1...providers.count))
-        XCTAssertTrue(menu.items[8].target === target)
-        XCTAssertEqual(menu.items[10].keyEquivalent, "r")
+        XCTAssertTrue(menu.items[9].target === target)
+        XCTAssertEqual(menu.items[14].keyEquivalent, "r")
     }
 
     @MainActor
@@ -32,7 +38,7 @@ final class StatusMenuTests: XCTestCase {
         let second = makeProviderMenuItems(providers: providers, currentProviderID: "deepseek", target: target, action: action)
         let menu = makeStatusMenu(isPanelVisible: true, providerItems: second, target: target,
                                   toggleAction: action, reloadAction: action,
-                                  shortcut: .defaultShortcut, settingsAction: action)
+                                  shortcut: .defaultShortcut, settingsItems: [])
         XCTAssertEqual(menu.items.first?.title, "隐藏 TapAsk")
         XCTAssertEqual(second.map(\.title), ["豆包", "DeepSeek", "Grok", "ChatGPT", "Claude", "Gemini"])
         for (a, b) in zip(first, second) { XCTAssertFalse(a === b) }

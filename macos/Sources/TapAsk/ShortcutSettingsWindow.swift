@@ -7,10 +7,12 @@ final class ShortcutSettingsWindowController: NSWindowController, NSWindowDelega
     var onSave: ((GlobalShortcut) throws -> Void)?
     var onRecordingChange: ((Bool) throws -> Void)?
     var onClose: (() -> Void)?
+    var onRequestClose: (() -> Void)?
     private(set) var isOpen = false
 
     private var draft: GlobalShortcut
     private var isRecording = false
+    var isRecordingShortcut: Bool { isRecording }
     private var needsRegistrationRestore = false
     private var eventMonitor: ShortcutEventMonitor?
     private let recorder = NSButton()
@@ -108,12 +110,7 @@ final class ShortcutSettingsWindowController: NSWindowController, NSWindowDelega
     }
 
     func present(shortcut: GlobalShortcut) {
-        isOpen = true
-        if stopRecording() {
-            draft = shortcut
-            errorLabel.stringValue = ""
-        }
-        updateRecorder()
+        prepare(shortcut: shortcut)
         generalView?.refresh()
         if NSApp.isHidden { NSApp.unhide(nil) }
         NSApp.activate()
@@ -121,6 +118,24 @@ final class ShortcutSettingsWindowController: NSWindowController, NSWindowDelega
         if settingsTabs == nil || settingsTabs?.selectedTabViewItem?.identifier as? String == "快捷键" {
             window?.makeFirstResponder(recorder)
         }
+    }
+
+    func prepare(shortcut: GlobalShortcut) {
+        isOpen = true
+        if stopRecording() {
+            draft = shortcut
+            errorLabel.stringValue = ""
+        }
+        updateRecorder()
+    }
+
+    func popoverShouldClose() -> Bool { stopRecording() }
+
+    func focusRecorder() { recorder.window?.makeFirstResponder(recorder) }
+
+    func popoverDidClose() {
+        isOpen = false
+        onClose?()
     }
 
     func windowShouldClose(_ sender: NSWindow) -> Bool { stopRecording() }
@@ -157,7 +172,7 @@ final class ShortcutSettingsWindowController: NSWindowController, NSWindowDelega
             isRecording = true
             eventMonitor = ShortcutEventMonitor { [weak self] event in
                 let consumed = MainActor.assumeIsolated {
-                    guard let self, let window = self.window,
+                    guard let self, let window = self.recorder.window,
                           event.window === window || (event.window == nil && window.isKeyWindow) else { return false }
                     return self.capture(event)
                 }
@@ -232,7 +247,8 @@ final class ShortcutSettingsWindowController: NSWindowController, NSWindowDelega
     }
 
     @objc private func cancel(_ sender: Any?) {
-        window?.performClose(nil)
+        if let onRequestClose { onRequestClose() }
+        else { window?.performClose(nil) }
     }
 
     @objc private func save(_ sender: Any?) {
@@ -242,7 +258,8 @@ final class ShortcutSettingsWindowController: NSWindowController, NSWindowDelega
         do {
             try onSave?(draft)
             needsRegistrationRestore = false
-            window?.performClose(nil)
+            if let onRequestClose { onRequestClose() }
+            else { window?.performClose(nil) }
         } catch {
             show(error)
         }
