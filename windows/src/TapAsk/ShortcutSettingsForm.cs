@@ -26,6 +26,7 @@ internal sealed class ShortcutSettingsForm : Form
         var cancel = new Button { Text = "取消", DialogResult = DialogResult.Cancel, AutoSize = true };
         var reset = new Button { Text = "恢复默认", AutoSize = true };
         ok.Click += (_, _) => { if (save(candidate)) { DialogResult = DialogResult.OK; Close(); } };
+        cancel.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
         reset.Click += (_, _) => RecordShortcut(GlobalShortcut.Default);
         buttons.Controls.AddRange([ok, cancel, reset]);
         Controls.Add(shortcutLabel); Controls.Add(instruction); Controls.Add(buttons);

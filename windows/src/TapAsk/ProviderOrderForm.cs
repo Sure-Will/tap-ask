@@ -14,7 +14,7 @@ internal sealed class ProviderOrderForm : Form
     {
         this.defaults = defaults;
         Text = "服务商排序";
-        ClientSize = new Size(360, 330);
+        ClientSize = new Size(360, 240);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MinimizeBox = MaximizeBox = false;

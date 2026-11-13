@@ -67,7 +67,7 @@ cd windows
 本地打包需要 Velopack 的 `vpk` 1.2.161，可将它放在 PATH 中或安装到仓库的 `private/vpk/`。以下命令只生成本地产物，不上传或发布：
 
 ```powershell
-.\scripts\pack.ps1 -Version 0.1.8
+.\scripts\pack.ps1 -Version 0.1.9
 ```
 
 产物位于 `windows/build/releases/`，包括 `TapAsk-win-Setup.exe`、便携包、Windows 更新清单和更新包。安装升级及开机自启仍需实机验收。

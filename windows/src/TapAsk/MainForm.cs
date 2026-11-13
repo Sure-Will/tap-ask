@@ -24,7 +24,7 @@ internal sealed class MainForm : Form
     private readonly Label originLabel = new() { Dock = DockStyle.Top, Height = 28, TextAlign = ContentAlignment.MiddleCenter, ForeColor = Color.White, BackColor = Color.FromArgb(45, 45, 45), AutoEllipsis = true, Visible = false };
     private readonly NavigationNoticeGate noticeGate = new();
     private readonly ProviderCatalog catalog;
-    private readonly SettingsStore settings = new();
+    private readonly SettingsStore settings;
     private readonly AppUpdater updater;
     private readonly Dictionary<string, ProviderSession> sessions = new(StringComparer.Ordinal);
     private readonly SessionRetentionPolicy retention = new();
@@ -34,7 +34,8 @@ internal sealed class MainForm : Form
     private LoginPopup? loginPopup;
     private Uri? interruptedLoginUrl;
     private ShortcutSettingsForm? shortcutSettings;
-    private SettingsForm? settingsForm;
+    private SettingsPopup? settingsPopup;
+    private Point? trayAnchor;
     private GlobalShortcut shortcut;
     private int hotkeyId = 1;
     private DragHandleForm? dragHandle;
@@ -47,9 +48,10 @@ internal sealed class MainForm : Form
     private bool environmentStarted;
     private IntPtr previousForeground;
 
-    public MainForm(bool startHidden = false)
+    public MainForm(bool startHidden = false, SettingsStore? settingsStore = null, ProviderCatalog? providerCatalog = null)
     {
         suppressInitialShow = startHidden;
+        settings = settingsStore ?? new SettingsStore();
         updater = new AppUpdater(settings);
         Text = "TapAsk";
         ClientSize = new Size(480, 720);
@@ -57,7 +59,7 @@ internal sealed class MainForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         ShowInTaskbar = false;
         TopMost = true;
-        catalog = ProviderCatalog.Load(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "providers.json")));
+        catalog = providerCatalog ?? ProviderCatalog.Load(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "providers.json")));
         providers = ProviderOrder.Ordered(catalog.Providers, settings.GetProviderOrder());
         shortcut = settings.GetGlobalShortcut();
         provider = ProviderSelection.Restored(providers, settings.GetLastProviderId())
@@ -75,6 +77,7 @@ internal sealed class MainForm : Form
         trayIcon = StatusIcon.Create();
         tray = new NotifyIcon { Icon = trayIcon, Text = "TapAsk — 单击呼出，右键菜单", ContextMenuStrip = menu, Visible = true };
         SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
+        tray.MouseDown += (_, _) => trayAnchor = Cursor.Position;
         tray.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) TogglePanel(); };
         Shown += (_, _) => PlaceOnCursorScreen();
         Shown += (_, _) =>
@@ -172,7 +175,7 @@ internal sealed class MainForm : Form
         }
         if (message.Msg == WmHotkey && message.WParam.ToInt32() == hotkeyId)
         {
-            if (shortcutSettings is not null && settingsForm?.ShortcutSelected == true) { shortcutSettings.RecordShortcut(shortcut); return; }
+            if (shortcutSettings is not null) { shortcutSettings.RecordShortcut(shortcut); return; }
             NavigationLog.Write(provider.Id, "hotkey", null, Visible ? "hide" : "show");
             TogglePanel(); return;
         }
@@ -193,7 +196,7 @@ internal sealed class MainForm : Form
             return true;
         }
         if (key == Keys.R) { ActiveSession?.Reload(); return true; }
-        if (key == Keys.Oemcomma) { EditSettings(); return true; }
+        if (key == Keys.Oemcomma) { ShowShortcutSettings(); return true; }
         return false;
     }
 
@@ -239,6 +242,7 @@ internal sealed class MainForm : Form
             loginPopup?.Dispose();
             foreach (var session in sessions.Values) session.Dispose();
             sessions.Clear();
+            settingsPopup?.Dispose();
             resizeBorder?.Dispose(); dragHandle?.Dispose();
             originOverlay?.Dispose(); noticeOverlay?.Dispose(); loadingOverlay?.Dispose();
             tray.Visible = false; menu.Dispose(); tray.Dispose(); trayIcon.Dispose();
@@ -260,7 +264,9 @@ internal sealed class MainForm : Form
         catch (InvalidOperationException) { /* The window closed before the notification was delivered. */ }
     }
 
-    private void BuildMenu()
+    internal ContextMenuStrip TrayMenu => menu;
+
+    internal void BuildMenu()
     {
         menu.Items.Clear();
         menu.Items.Add(new ToolStripMenuItem(Visible ? "隐藏 TapAsk" : "显示 TapAsk", null, (_, _) => TogglePanel()) { ShortcutKeyDisplayString = shortcut.ToString() });
@@ -271,8 +277,18 @@ internal sealed class MainForm : Form
             menu.Items.Add(new ToolStripMenuItem(itemProvider.Name, null, (_, _) => SwitchProvider(itemProvider))
             { Checked = itemProvider.Id == provider.Id, ShortcutKeyDisplayString = $"Ctrl+{i + 1}" });
         }
-        menu.Items.Add(new ToolStripMenuItem("设置…", null, (_, _) => EditSettings()));
+        menu.Items.Add(new ToolStripSeparator());
+        var startup = new ToolStripMenuItem("登录时启动 TapAsk") { Checked = StartupRegistration.IsEnabled() };
+        startup.Click += (_, _) => SetStartupEnabled(!startup.Checked);
+        menu.Items.Add(startup);
+        var automatic = new ToolStripMenuItem("自动检查并下载更新") { Checked = updater.Enabled };
+        automatic.Click += (_, _) => updater.SetEnabled(!automatic.Checked);
+        menu.Items.Add(automatic);
+        menu.Items.Add(new ToolStripMenuItem("设置快捷键…", null, (_, _) => ShowShortcutSettings()));
+        menu.Items.Add(new ToolStripMenuItem("调整服务商顺序…", null, (_, _) => ShowProviderOrder()));
+        menu.Items.Add(new ToolStripMenuItem("检查更新…", null, async (_, _) => await updater.CheckAsync(interactive: true)));
         AddUpdateMenuItems(menu.Items, updater.HasPendingUpdate, InstallReadyUpdate);
+        menu.Items.Add(new ToolStripMenuItem($"TapAsk {Application.ProductVersion}") { Enabled = false });
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(new ToolStripMenuItem("重新加载", null, (_, _) => ActiveSession?.Reload()) { ShortcutKeyDisplayString = "Ctrl+R" });
         menu.Items.Add(new ToolStripSeparator());
@@ -298,17 +314,50 @@ internal sealed class MainForm : Form
         ExitApp();
     }
 
-    private void EditSettings()
+    private void SetStartupEnabled(bool enabled)
     {
-        using var form = new SettingsForm(catalog.Providers, providers, shortcut, SaveShortcut, ordered =>
+        try { StartupRegistration.SetEnabled(enabled); settings.SaveAutoStartAttempted(); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException or InvalidOperationException)
         {
-            providers = ordered;
+            MessageBox.Show(ex.Message, "无法更改登录时启动", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
+
+    private void ShowShortcutSettings() => ShowSettingsPopup(() =>
+    {
+        var form = new ShortcutSettingsForm(shortcut, SaveShortcut);
+        shortcutSettings = form;
+        return form;
+    });
+
+    private void ShowProviderOrder() => ShowSettingsPopup(() =>
+    {
+        var form = new ProviderOrderForm(catalog.Providers, providers);
+        form.FormClosed += (_, _) =>
+        {
+            if (form.DialogResult != DialogResult.OK) return;
+            providers = form.OrderedProviders;
             settings.SaveProviderOrder(providers.Select(p => p.Id));
-        }, updater, settings);
-        settingsForm = form;
-        shortcutSettings = form.ShortcutForm;
-        try { form.ShowDialog(this); }
-        finally { shortcutSettings = null; settingsForm = null; }
+        };
+        return form;
+    });
+
+    private void ShowSettingsPopup(Func<Form> makeContent)
+    {
+        BeginInvoke(() =>
+        {
+            if (IsDisposed || Disposing) return;
+            settingsPopup?.Close();
+            var popup = new SettingsPopup(makeContent());
+            settingsPopup = popup;
+            popup.Closed += (_, _) =>
+            {
+                if (settingsPopup == popup) { settingsPopup = null; shortcutSettings = null; }
+                popup.Dispose();
+            };
+            var screen = Screen.PrimaryScreen ?? Screen.FromPoint(Cursor.Position);
+            popup.ShowAt(trayAnchor ?? SettingsPopup.DefaultAnchor(screen.Bounds, screen.WorkingArea));
+        });
     }
 
     private bool SaveShortcut(GlobalShortcut next)

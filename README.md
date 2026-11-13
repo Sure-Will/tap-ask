@@ -5,11 +5,11 @@
   <p>需要时打开，问完后收起，继续手头的事。</p>
   <p>ChatGPT · Claude · Gemini · DeepSeek · Grok · 豆包</p>
   <p>
-    <a href="https://github.com/Sure-Will/tap-ask/releases/download/v0.1.8/TapAsk-0.1.8-macOS.dmg"><strong>下载 macOS</strong></a> ·
-    <a href="https://github.com/Sure-Will/tap-ask/releases/download/v0.1.8/TapAsk-win-Setup.exe"><strong>下载 Windows</strong></a> ·
-    <a href="https://github.com/Sure-Will/tap-ask/releases/download/v0.1.8/TapAsk-win-Portable.zip">Windows 便携版</a>
+    <a href="https://github.com/Sure-Will/tap-ask/releases/download/v0.1.9/TapAsk-0.1.9-macOS.dmg"><strong>下载 macOS</strong></a> ·
+    <a href="https://github.com/Sure-Will/tap-ask/releases/download/v0.1.9/TapAsk-win-Setup.exe"><strong>下载 Windows</strong></a> ·
+    <a href="https://github.com/Sure-Will/tap-ask/releases/download/v0.1.9/TapAsk-win-Portable.zip">Windows 便携版</a>
   </p>
-  <p>当前下载为 0.1.8 · <a href="https://github.com/Sure-Will/tap-ask/releases">查看所有版本</a></p>
+  <p>当前下载为 0.1.9 · <a href="https://github.com/Sure-Will/tap-ask/releases">查看所有版本</a></p>
 </div>
 
 ## TapAsk 能做什么
@@ -26,8 +26,8 @@ TapAsk 把六家 AI 网站放在同一个小窗口里。你可以在写代码、
 
 | 平台 | 下载 | 系统要求 |
 | --- | --- | --- |
-| macOS | [通用安装包](https://github.com/Sure-Will/tap-ask/releases/download/v0.1.8/TapAsk-0.1.8-macOS.dmg) | macOS 14 或更高版本，支持 Apple 芯片和 Intel |
-| Windows | [安装版](https://github.com/Sure-Will/tap-ask/releases/download/v0.1.8/TapAsk-win-Setup.exe) · [便携版](https://github.com/Sure-Will/tap-ask/releases/download/v0.1.8/TapAsk-win-Portable.zip) | Windows x64，需要 WebView2 Runtime |
+| macOS | [通用安装包](https://github.com/Sure-Will/tap-ask/releases/download/v0.1.9/TapAsk-0.1.9-macOS.dmg) | macOS 14 或更高版本，支持 Apple 芯片和 Intel |
+| Windows | [安装版](https://github.com/Sure-Will/tap-ask/releases/download/v0.1.9/TapAsk-win-Setup.exe) · [便携版](https://github.com/Sure-Will/tap-ask/releases/download/v0.1.9/TapAsk-win-Portable.zip) | Windows x64，需要 WebView2 Runtime |
 
 ### macOS
 
@@ -61,9 +61,9 @@ xattr -dr com.apple.quarantine /Applications/TapAsk.app
 | 显示或收起浮窗 | ⌥空格 | Alt+空格 |
 | 切换第 1 到第 6 个服务商 | ⌘1 到 ⌘6 | Ctrl+1 到 Ctrl+6 |
 | 重新加载当前页面 | ⌘R | Ctrl+R |
-| 打开设置（浮窗在前台时） | ⌘, | Ctrl+, |
+| 打开快捷键设置（浮窗在前台时） | ⌘, | Ctrl+, |
 
-表中显示默认的呼出快捷键，服务商编号随菜单中的排序变化。右键菜单栏或托盘图标可以选择服务商；Mac 版也在菜单栏菜单中调整排序、快捷键、自启与更新，Windows 版从托盘的“设置…”调整。
+表中显示默认的呼出快捷键，服务商编号随菜单中的排序变化。右键菜单栏或托盘图标可以选择服务商，并调整排序、快捷键、自启与更新。快捷键和排序在图标附近的小面板中设置。
 
 拖动浮窗顶部中央的短白条可以移动窗口，拖动边缘可以调整大小。
 
@@ -71,7 +71,7 @@ xattr -dr com.apple.quarantine /Applications/TapAsk.app
 
 **快捷键没有反应怎么办？**
 
-先确认 TapAsk 正在运行，再单击菜单栏或托盘图标打开浮窗。Mac 右键菜单栏图标选择“设置快捷键…”；Windows 右键托盘图标进入“设置…”的快捷键页。macOS 组合键须包含 ⌘、⌥ 或 ⌃，Windows 须包含 Ctrl 或 Alt；都可以加 Shift。注册失败时会保留原设置；系统不一定能报告所有冲突，保存后请实际按键确认。
+先确认 TapAsk 正在运行，再单击菜单栏或托盘图标打开浮窗。右键菜单栏或托盘图标，选择“设置快捷键…”。macOS 组合键须包含 ⌘、⌥ 或 ⌃，Windows 须包含 Ctrl 或 Alt；都可以加 Shift。注册失败时会保留原设置；系统不一定能报告所有冲突，保存后请实际按键确认。
 
 **收起浮窗和退出有什么区别？**
 
