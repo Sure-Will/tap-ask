@@ -4,6 +4,7 @@ using Xunit;
 
 namespace TapAsk.WindowsTests;
 
+[Collection("Desktop UI")]
 public class InfoOverlayTests
 {
     [Fact]

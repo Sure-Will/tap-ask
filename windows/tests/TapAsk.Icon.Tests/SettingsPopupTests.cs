@@ -6,6 +6,7 @@ using Xunit;
 
 namespace TapAsk.WindowsTests;
 
+[Collection("Desktop UI")]
 public class SettingsPopupTests
 {
     [Fact]

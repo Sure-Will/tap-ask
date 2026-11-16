@@ -367,7 +367,8 @@ internal sealed class MainForm : Form
             popup.Closed += (_, _) =>
             {
                 if (settingsPopup == popup) { settingsPopup = null; shortcutSettings = null; }
-                popup.Dispose();
+                // ToolStripDropDown still uses its handle after raising Closed.
+                if (!IsDisposed && !Disposing) BeginInvoke(() => popup.Dispose());
             };
             var screen = anchor is { } position ? Screen.FromPoint(position) : Screen.FromControl(this);
             popup.ShowAt(anchor ?? SettingsPopup.DefaultAnchor(screen.Bounds, screen.WorkingArea));
