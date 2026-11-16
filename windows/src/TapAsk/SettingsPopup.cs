@@ -47,14 +47,22 @@ internal sealed class SettingsPopup : ToolStripDropDown
 
     public void ShowAt(Point anchor)
     {
-        Show(anchor, ToolStripDropDownDirection.AboveLeft);
+        Show(anchor, DirectionFor(anchor, Screen.FromPoint(anchor).WorkingArea));
         content.Focus();
+    }
+
+    internal static ToolStripDropDownDirection DirectionFor(Point anchor, Rectangle work)
+    {
+        bool above = anchor.Y >= work.Top + work.Height / 2;
+        bool left = anchor.X >= work.Left + work.Width / 2;
+        if (above) return left ? ToolStripDropDownDirection.AboveLeft : ToolStripDropDownDirection.AboveRight;
+        return left ? ToolStripDropDownDirection.BelowLeft : ToolStripDropDownDirection.BelowRight;
     }
 
     internal static Point DefaultAnchor(Rectangle screen, Rectangle work)
     {
-        if (work.Top > screen.Top) return new Point(work.Right, work.Top);
-        if (work.Left > screen.Left) return new Point(work.Left, work.Bottom);
-        return new Point(work.Right, work.Bottom);
+        if (work.Top > screen.Top) return new Point(work.Right - 1, work.Top);
+        if (work.Left > screen.Left) return new Point(work.Left, work.Bottom - 1);
+        return new Point(work.Right - 1, work.Bottom - 1);
     }
 }

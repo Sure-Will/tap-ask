@@ -9,13 +9,31 @@ namespace TapAsk.WindowsTests;
 public class SettingsPopupTests
 {
     [Fact]
+    public void FallbackAnchorRemainsInsideItsScreenAtAMonitorBoundary()
+    {
+        var screen = new Rectangle(0, 0, 1920, 1080);
+        var anchor = SettingsPopup.DefaultAnchor(screen, new Rectangle(0, 0, 1920, 1040));
+        Assert.True(screen.Contains(anchor), $"Anchor {anchor} is outside screen {screen}.");
+    }
+
+    [Fact]
     public void FallbackAnchorFollowsTaskbarEdge()
     {
         var screen = new Rectangle(0, 0, 1920, 1080);
-        Assert.Equal(new Point(1920, 1040), SettingsPopup.DefaultAnchor(screen, new Rectangle(0, 0, 1920, 1040)));
-        Assert.Equal(new Point(1920, 40), SettingsPopup.DefaultAnchor(screen, new Rectangle(0, 40, 1920, 1040)));
-        Assert.Equal(new Point(40, 1080), SettingsPopup.DefaultAnchor(screen, new Rectangle(40, 0, 1880, 1080)));
-        Assert.Equal(new Point(1880, 1080), SettingsPopup.DefaultAnchor(screen, new Rectangle(0, 0, 1880, 1080)));
+        Assert.Equal(new Point(1919, 1039), SettingsPopup.DefaultAnchor(screen, new Rectangle(0, 0, 1920, 1040)));
+        Assert.Equal(new Point(1919, 40), SettingsPopup.DefaultAnchor(screen, new Rectangle(0, 40, 1920, 1040)));
+        Assert.Equal(new Point(40, 1079), SettingsPopup.DefaultAnchor(screen, new Rectangle(40, 0, 1880, 1080)));
+        Assert.Equal(new Point(1879, 1079), SettingsPopup.DefaultAnchor(screen, new Rectangle(0, 0, 1880, 1080)));
+    }
+
+    [Fact]
+    public void PopupOpensTowardsTheWorkingAreaIncludingOnNegativeCoordinates()
+    {
+        var work = new Rectangle(-1920, 40, 1920, 1040);
+        Assert.Equal(ToolStripDropDownDirection.BelowRight, SettingsPopup.DirectionFor(new Point(-1910, 10), work));
+        Assert.Equal(ToolStripDropDownDirection.BelowLeft, SettingsPopup.DirectionFor(new Point(-10, 10), work));
+        Assert.Equal(ToolStripDropDownDirection.AboveRight, SettingsPopup.DirectionFor(new Point(-1910, 1060), work));
+        Assert.Equal(ToolStripDropDownDirection.AboveLeft, SettingsPopup.DirectionFor(new Point(-10, 1060), work));
     }
 
     [Fact]
@@ -26,11 +44,14 @@ public class SettingsPopupTests
             GlobalShortcut? saved = null;
             using var form = new ShortcutSettingsForm(GlobalShortcut.Default, value => { saved = value; return true; });
             using var popup = new SettingsPopup(form);
+            Assert.True(popup.AutoClose);
+            // Control interaction is tested independently of other applications taking desktop focus.
+            popup.AutoClose = false;
             popup.ShowAt(Anchor());
             Application.DoEvents();
             Assert.True(popup.Visible);
             Assert.False(form.TopLevel);
-            Assert.True(form.ContainsFocus);
+            Assert.True(form.CanFocus);
             Assert.True(Screen.FromPoint(Anchor()).WorkingArea.Contains(popup.Bounds));
             AssertControlsFit(form);
             var handler = typeof(ShortcutSettingsForm).GetMethod("ProcessCmdKey", BindingFlags.Instance | BindingFlags.NonPublic)!;
@@ -64,9 +85,18 @@ public class SettingsPopupTests
             using var form = new ProviderOrderForm(providers, providers);
             form.FormClosed += (_, _) => { if (form.DialogResult == DialogResult.OK) saved = form.OrderedProviders; };
             using var popup = new SettingsPopup(form);
+            Assert.True(popup.AutoClose);
+            // The reorder test invokes controls directly; it does not own the desktop foreground.
+            popup.AutoClose = false;
+            var events = new List<string>();
+            popup.VisibleChanged += (_, _) => events.Add($"Visible={popup.Visible}");
+            popup.Opened += (_, _) => events.Add("Opened");
+            popup.Closing += (_, e) => events.Add($"Closing={e.CloseReason}");
+            popup.Closed += (_, e) => events.Add($"Closed={e.CloseReason}");
             popup.ShowAt(Anchor());
             Application.DoEvents();
-            Assert.True(popup.Visible);
+            Assert.True(popup.Visible, $"Order popup was not visible; disposed={popup.IsDisposed}, " +
+                                       $"contentVisible={form.Visible}, events=[{string.Join(", ", events)}].");
             Assert.False(form.TopLevel);
             AssertControlsFit(form);
             var list = Assert.Single(form.Controls.OfType<ListBox>());

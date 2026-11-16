@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using Microsoft.Web.WebView2.Core;
@@ -12,7 +13,7 @@ internal sealed class MainForm : Form
     private const int WmNcCalcSize = 0x0083, WmNcHitTest = 0x0084;
     private readonly NotifyIcon tray;
     private Icon trayIcon;
-    private readonly ContextMenuStrip menu = new();
+    private readonly NativeTrayMenu menu = new();
     private readonly Panel pageHost = new() { Dock = DockStyle.Fill, BackColor = Color.FromArgb(30, 30, 30) };
     private readonly Panel loadOverlay = new() { Dock = DockStyle.Fill, BackColor = Color.FromArgb(30, 30, 30), Visible = false };
     private readonly Label loadMessage = new() { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, ForeColor = Color.White };
@@ -35,7 +36,6 @@ internal sealed class MainForm : Form
     private Uri? interruptedLoginUrl;
     private ShortcutSettingsForm? shortcutSettings;
     private SettingsPopup? settingsPopup;
-    private Point? trayAnchor;
     private GlobalShortcut shortcut;
     private int hotkeyId = 1;
     private DragHandleForm? dragHandle;
@@ -73,12 +73,14 @@ internal sealed class MainForm : Form
         retryButton.BringToFront();
         loadOverlay.Resize += (_, _) => retryButton.Location = new Point((loadOverlay.Width - retryButton.Width) / 2, loadOverlay.Height / 2 + 32);
         retryButton.Click += (_, _) => ActiveSession?.Reload();
-        menu.Opening += (_, _) => BuildMenu();
         trayIcon = StatusIcon.Create();
-        tray = new NotifyIcon { Icon = trayIcon, Text = "TapAsk — 单击呼出，右键菜单", ContextMenuStrip = menu, Visible = true };
+        tray = new NotifyIcon { Icon = trayIcon, Text = "TapAsk — 单击呼出，右键菜单", Visible = true };
         SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
-        tray.MouseDown += (_, _) => trayAnchor = Cursor.Position;
-        tray.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) TogglePanel(); };
+        tray.MouseClick += (_, e) =>
+        {
+            if (e.Button == MouseButtons.Left) TogglePanel();
+            else if (e.Button == MouseButtons.Right) ShowTrayMenu(Cursor.Position);
+        };
         Shown += (_, _) => PlaceOnCursorScreen();
         Shown += (_, _) =>
         {
@@ -264,42 +266,54 @@ internal sealed class MainForm : Form
         catch (InvalidOperationException) { /* The window closed before the notification was delivered. */ }
     }
 
-    internal ContextMenuStrip TrayMenu => menu;
-
-    internal void BuildMenu()
+    private void ShowTrayMenu(Point anchor)
     {
-        menu.Items.Clear();
-        menu.Items.Add(new ToolStripMenuItem(Visible ? "隐藏 TapAsk" : "显示 TapAsk", null, (_, _) => TogglePanel()) { ShortcutKeyDisplayString = shortcut.ToString() });
-        menu.Items.Add(new ToolStripSeparator());
+        Action? action;
+        try { action = menu.Show(anchor, BuildMenu(anchor)); }
+        catch (Exception ex) when (ex is Win32Exception or InvalidOperationException)
+        {
+            NavigationLog.Write("app", "tray-menu", null, ex.GetType().Name);
+            MessageBox.Show("无法打开托盘菜单。", "TapAsk", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        if (!IsDisposed && !Disposing) action?.Invoke();
+    }
+
+    internal List<TrayMenuItem> BuildMenu(Point? anchor = null)
+    {
+        var items = new List<TrayMenuItem>
+        {
+            new(Visible ? "隐藏 TapAsk" : "显示 TapAsk", TogglePanel, Shortcut: shortcut.ToString()),
+            TrayMenuItem.Separator
+        };
         for (int i = 0; i < providers.Length; i++)
         {
             var itemProvider = providers[i];
-            menu.Items.Add(new ToolStripMenuItem(itemProvider.Name, null, (_, _) => SwitchProvider(itemProvider))
-            { Checked = itemProvider.Id == provider.Id, ShortcutKeyDisplayString = $"Ctrl+{i + 1}" });
+            items.Add(new TrayMenuItem(itemProvider.Name, () => SwitchProvider(itemProvider),
+                                       Checked: itemProvider.Id == provider.Id, Shortcut: $"Ctrl+{i + 1}"));
         }
-        menu.Items.Add(new ToolStripSeparator());
-        var startup = new ToolStripMenuItem("登录时启动 TapAsk") { Checked = StartupRegistration.IsEnabled() };
-        startup.Click += (_, _) => SetStartupEnabled(!startup.Checked);
-        menu.Items.Add(startup);
-        var automatic = new ToolStripMenuItem("自动检查并下载更新") { Checked = updater.Enabled };
-        automatic.Click += (_, _) => updater.SetEnabled(!automatic.Checked);
-        menu.Items.Add(automatic);
-        menu.Items.Add(new ToolStripMenuItem("设置快捷键…", null, (_, _) => ShowShortcutSettings()));
-        menu.Items.Add(new ToolStripMenuItem("调整服务商顺序…", null, (_, _) => ShowProviderOrder()));
-        menu.Items.Add(new ToolStripMenuItem("检查更新…", null, async (_, _) => await updater.CheckAsync(interactive: true)));
-        AddUpdateMenuItems(menu.Items, updater.HasPendingUpdate, InstallReadyUpdate);
-        menu.Items.Add(new ToolStripMenuItem($"TapAsk {Application.ProductVersion}") { Enabled = false });
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(new ToolStripMenuItem("重新加载", null, (_, _) => ActiveSession?.Reload()) { ShortcutKeyDisplayString = "Ctrl+R" });
-        menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add(new ToolStripMenuItem("退出 TapAsk", null, (_, _) => ExitApp()));
+        items.Add(TrayMenuItem.Separator);
+        bool startup = StartupRegistration.IsEnabled();
+        bool automatic = updater.Enabled;
+        items.Add(new TrayMenuItem("登录时启动 TapAsk", () => SetStartupEnabled(!StartupRegistration.IsEnabled()), Checked: startup));
+        items.Add(new TrayMenuItem("自动检查并下载更新", () => updater.SetEnabled(!updater.Enabled), Checked: automatic));
+        items.Add(new TrayMenuItem("设置快捷键…", () => ShowShortcutSettings(anchor)));
+        items.Add(new TrayMenuItem("调整服务商顺序…", () => ShowProviderOrder(anchor)));
+        items.Add(new TrayMenuItem("检查更新…", async () => await updater.CheckAsync(interactive: true)));
+        AddUpdateMenuItems(items, updater.HasPendingUpdate, InstallReadyUpdate);
+        items.Add(new TrayMenuItem($"TapAsk {Application.ProductVersion}", Enabled: false));
+        items.Add(TrayMenuItem.Separator);
+        items.Add(new TrayMenuItem("重新加载", () => ActiveSession?.Reload(), Shortcut: "Ctrl+R"));
+        items.Add(TrayMenuItem.Separator);
+        items.Add(new TrayMenuItem("退出 TapAsk", ExitApp));
+        return items;
     }
 
-    internal static void AddUpdateMenuItems(ToolStripItemCollection items, bool ready, Action install)
+    internal static void AddUpdateMenuItems(List<TrayMenuItem> items, bool ready, Action install)
     {
         if (!ready) return;
-        items.Add(new ToolStripMenuItem("更新已下载") { Enabled = false });
-        items.Add(new ToolStripMenuItem("立即安装并重启", null, (_, _) => install()));
+        items.Add(new TrayMenuItem("更新已下载", Enabled: false));
+        items.Add(new TrayMenuItem("立即安装并重启", install));
     }
 
     private void InstallReadyUpdate()
@@ -323,14 +337,14 @@ internal sealed class MainForm : Form
         }
     }
 
-    private void ShowShortcutSettings() => ShowSettingsPopup(() =>
+    private void ShowShortcutSettings(Point? anchor = null) => ShowSettingsPopup(() =>
     {
         var form = new ShortcutSettingsForm(shortcut, SaveShortcut);
         shortcutSettings = form;
         return form;
-    });
+    }, anchor);
 
-    private void ShowProviderOrder() => ShowSettingsPopup(() =>
+    private void ShowProviderOrder(Point? anchor = null) => ShowSettingsPopup(() =>
     {
         var form = new ProviderOrderForm(catalog.Providers, providers);
         form.FormClosed += (_, _) =>
@@ -340,9 +354,9 @@ internal sealed class MainForm : Form
             settings.SaveProviderOrder(providers.Select(p => p.Id));
         };
         return form;
-    });
+    }, anchor);
 
-    private void ShowSettingsPopup(Func<Form> makeContent)
+    private void ShowSettingsPopup(Func<Form> makeContent, Point? anchor)
     {
         BeginInvoke(() =>
         {
@@ -355,8 +369,8 @@ internal sealed class MainForm : Form
                 if (settingsPopup == popup) { settingsPopup = null; shortcutSettings = null; }
                 popup.Dispose();
             };
-            var screen = Screen.PrimaryScreen ?? Screen.FromPoint(Cursor.Position);
-            popup.ShowAt(trayAnchor ?? SettingsPopup.DefaultAnchor(screen.Bounds, screen.WorkingArea));
+            var screen = anchor is { } position ? Screen.FromPoint(position) : Screen.FromControl(this);
+            popup.ShowAt(anchor ?? SettingsPopup.DefaultAnchor(screen.Bounds, screen.WorkingArea));
         });
     }
 
